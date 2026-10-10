@@ -45,7 +45,9 @@ final class Commands {
                         context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": no SkyBlock profile yet").withStyle(ChatFormatting.RED));
                         return 0;
                     }
-                    context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": " + id + " x" + api.count(id)).withStyle(ChatFormatting.GOLD));
+                    String name = api.item(id).map(i -> i.name() + (i.observed() ? " (observed)" : i.retired() ? " (retired)" : "")).orElse("unknown item");
+                    context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": " + id + " (" + name + ") x" + api.count(id)
+                        + ", " + api.recipes(id).size() + " recipe(s), used in " + api.usages(id).size()).withStyle(ChatFormatting.GOLD));
                     for (ItemCount row : api.counts(id)) {
                         context.getSource().sendFeedback(Component.literal("- " + row.container() + " slot " + row.slot() + ": " + row.amount()).withStyle(ChatFormatting.WHITE));
                     }

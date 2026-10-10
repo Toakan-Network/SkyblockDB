@@ -17,7 +17,8 @@ import java.util.concurrent.CompletableFuture;
  * a major version of SkyblockDB.
  */
 public interface SkyblockDbApi {
-    int API_VERSION = 1;
+    /** 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). */
+    int API_VERSION = 2;
 
     /** The API, once SkyblockDB has started (from client initialisation on). Empty if it isn't installed. */
     static Optional<SkyblockDbApi> get() {
@@ -68,6 +69,26 @@ public interface SkyblockDbApi {
 
     /** How an item's total changed on a profile since {@code since}, oldest first. */
     CompletableFuture<List<HistoryPoint>> history(String profile, String sbId, Instant since);
+
+    // Reference data (API_VERSION 2). Empty until the item repository has loaded once (then kept between sessions).
+
+    /** What is known about an ID, current, retired or observed. */
+    Optional<ReferenceItem> item(String sbId);
+
+    /** Every known item by SkyBlock ID. */
+    Map<String, ReferenceItem> referenceItems();
+
+    /** The recipes that make {@code sbId}, every type. */
+    List<Recipe> recipes(String sbId);
+
+    /** The recipes that use {@code sbId} as an input. */
+    List<Recipe> usages(String sbId);
+
+    /** Reference changes recorded since {@code since} (null: all), oldest first. */
+    CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since);
+
+    /** Our own observations; {@code openOnly} leaves out the ones a repository update has confirmed. */
+    CompletableFuture<List<Observation>> observations(boolean openOnly);
 
     void addListener(SkyblockDbListener listener);
 

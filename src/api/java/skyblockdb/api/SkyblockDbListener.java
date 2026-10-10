@@ -16,4 +16,10 @@ public interface SkyblockDbListener {
 
     /** The current profile changed, or a profile's details (name, type, level) did. */
     default void onProfileChanged(String profile) {}
+
+    /**
+     * Reference data changed (API_VERSION 2): {@code kinds} are {@code items} and/or {@code recipes}, {@code ids}
+     * the SkyBlock IDs affected. Also called once when the reference data first becomes readable in a session.
+     */
+    default void onReferenceDataChanged(Set<String> kinds, Set<String> ids) {}
 }

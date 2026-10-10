@@ -27,11 +27,16 @@ import java.util.function.Function;
  *   <li>{@code item_counts}: profile|container|slot -> [SkyBlock ID, amount, seen at, source, confident].</li>
  *   <li>{@code currencies}: profile|currency -> [value, seen at].</li>
  *   <li>{@code history}: profile|SkyBlock ID|epoch ms (13 digits) -> total amount after the change.</li>
+ *   <li>{@code items}: SkyBlock ID -> [name, rarity, category, origin (repo/observed), retired at (0: current)].</li>
+ *   <li>{@code recipes}: type|output|n -> [output count, inputs "ID*n;ID*n" (sorted), coins, seconds, npc].</li>
+ *   <li>{@code reference_changes}: epoch ms (13 digits)|sequence (6) -> [SkyBlock ID, kind, change, field, old,
+ *       new, repo SHA].</li>
+ *   <li>{@code observations}: SkyBlock ID|kind -> [seen value, first seen, last seen, sessions, resolved at (0: open)].</li>
  * </ul>
  */
 public final class Store {
     /** Bump when the layout changes, and add a step to {@link #migrate}. */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     /** Key separator. Never part of a UUID, container name, currency name or SkyBlock ID. */
     public static final String SEP = "|";
 
@@ -49,6 +54,10 @@ public final class Store {
     private MVMap<String, Object[]> itemCounts;
     private MVMap<String, Object[]> currencies;
     private MVMap<String, Long> history;
+    private MVMap<String, Object[]> items;
+    private MVMap<String, Object[]> recipes;
+    private MVMap<String, Object[]> referenceChanges;
+    private MVMap<String, Object[]> observations;
 
     private Store() {}
 
@@ -72,6 +81,10 @@ public final class Store {
                 itemCounts = store.openMap("item_counts", new MVMap.Builder<>());
                 currencies = store.openMap("currencies", new MVMap.Builder<>());
                 history = store.openMap("history", new MVMap.Builder<>());
+                items = store.openMap("items", new MVMap.Builder<>());
+                recipes = store.openMap("recipes", new MVMap.Builder<>());
+                referenceChanges = store.openMap("reference_changes", new MVMap.Builder<>());
+                observations = store.openMap("observations", new MVMap.Builder<>());
                 migrate();
                 store.commit();
                 SkyblockDb.debug("Store opened: {} item rows, {} profiles", itemCounts.size(), profiles.size());
@@ -89,7 +102,8 @@ public final class Store {
         if (version > SCHEMA_VERSION) {
             throw new IllegalStateException("Store is schema " + version + ", newer than this mod (" + SCHEMA_VERSION + ")");
         }
-        // Version 0 -> 1: new file, the maps above are the whole layout. Later steps go here, in order.
+        // 0 -> 1: new file. 1 -> 2: the reference maps (items, recipes, reference_changes, observations), which
+        // open empty and fill on the next repository load. Later steps go here, in order.
         meta.put("schema_version", Integer.toString(SCHEMA_VERSION));
     }
 
@@ -165,4 +179,8 @@ public final class Store {
     public MVMap<String, Object[]> itemCounts() { return itemCounts; }
     public MVMap<String, Object[]> currencies() { return currencies; }
     public MVMap<String, Long> history() { return history; }
+    public MVMap<String, Object[]> items() { return items; }
+    public MVMap<String, Object[]> recipes() { return recipes; }
+    public MVMap<String, Object[]> referenceChanges() { return referenceChanges; }
+    public MVMap<String, Object[]> observations() { return observations; }
 }

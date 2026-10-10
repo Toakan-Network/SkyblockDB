@@ -10,6 +10,7 @@ import skyblockdb.SkyblockDb;
 import skyblockdb.api.Currency;
 import skyblockdb.api.ItemCount;
 import skyblockdb.api.Profile;
+import skyblockdb.reference.ReferenceData;
 import skyblockdb.SkyblockDetector;
 import skyblockdb.store.Store;
 import tech.thatgravyboat.skyblockapi.api.SkyBlockAPI;
@@ -80,6 +81,8 @@ public final class Recorder {
     private static String current;
     /** Last profile row written per profile, without its time, so unchanged profiles aren't rewritten. */
     private static final Map<String, String> profileSignatures = new HashMap<>();
+    /** Display names of IDs the reference data doesn't know, gathered during one read. */
+    private static final Map<String, String> seenNames = new LinkedHashMap<>();
     private static boolean syncWanted = false;
     private static int ticksSinceSync = 0;
     private static int currencyTicks = 0;
@@ -87,31 +90,32 @@ public final class Recorder {
 
     private Recorder() {}
 
-    public static void register() {
-        Store.get().open(store -> {
-            // Writer thread: copy what is stored, then hand it to the client thread.
-            Map<String, Row> storedRows = new HashMap<>();
-            store.itemCounts().forEach((k, v) -> storedRows.put(k, Row.decode(v)));
-            Map<String, Currency> storedCurrencies = new HashMap<>();
-            store.currencies().forEach((k, v) -> storedCurrencies.put(k, currency(k, ((Number) v[0]).doubleValue(), (Long) v[1])));
-            List<Profile> storedProfiles = new ArrayList<>();
-            store.profiles().forEach((k, v) -> storedProfiles.add(new Profile(k, (String) v[0], (String) v[1],
-                (String) v[2], ((Long) v[3]).intValue(), Instant.ofEpochMilli((Long) v[4]))));
-            Minecraft.getInstance().execute(() -> {
-                rows.putAll(storedRows);
-                currencies.putAll(storedCurrencies);
-                Set<String> known = new HashSet<>();
-                for (String key : rows.keySet()) known.add(key.substring(0, key.indexOf(Store.SEP)));
-                for (String key : currencies.keySet()) known.add(key.substring(0, key.indexOf(Store.SEP)));
-                for (Profile p : storedProfiles) {
-                    ApiImpl.INSTANCE.publishProfile(p);
-                    profileSignatures.put(p.profileUuid(), signature(p.playerUuid(), p.name(), p.type(), p.sbLevel()));
-                }
-                known.forEach(Recorder::publish);
-                loaded = true;
-                syncWanted = true;
-            });
+    /** Writer thread, right after the store opened: copy what is stored, then hand it to the client thread. */
+    public static void onStoreOpened(Store store) {
+        Map<String, Row> storedRows = new HashMap<>();
+        store.itemCounts().forEach((k, v) -> storedRows.put(k, Row.decode(v)));
+        Map<String, Currency> storedCurrencies = new HashMap<>();
+        store.currencies().forEach((k, v) -> storedCurrencies.put(k, currency(k, ((Number) v[0]).doubleValue(), (Long) v[1])));
+        List<Profile> storedProfiles = new ArrayList<>();
+        store.profiles().forEach((k, v) -> storedProfiles.add(new Profile(k, (String) v[0], (String) v[1],
+            (String) v[2], ((Long) v[3]).intValue(), Instant.ofEpochMilli((Long) v[4]))));
+        Minecraft.getInstance().execute(() -> {
+            rows.putAll(storedRows);
+            currencies.putAll(storedCurrencies);
+            Set<String> known = new HashSet<>();
+            for (String key : rows.keySet()) known.add(key.substring(0, key.indexOf(Store.SEP)));
+            for (String key : currencies.keySet()) known.add(key.substring(0, key.indexOf(Store.SEP)));
+            for (Profile p : storedProfiles) {
+                ApiImpl.INSTANCE.publishProfile(p);
+                profileSignatures.put(p.profileUuid(), signature(p.playerUuid(), p.name(), p.type(), p.sbLevel()));
+            }
+            known.forEach(Recorder::publish);
+            loaded = true;
+            syncWanted = true;
         });
+    }
+
+    public static void register() {
         SkyBlockAPI.getEventBus().register(SacksChangeEvent.class, 0, false, event -> want());
         SkyBlockAPI.getEventBus().register(ContainerCloseEvent.class, 0, false, event -> want());
         SkyBlockAPI.getEventBus().register(ProfileChangeEvent.class, 0, false, event -> want());
@@ -163,12 +167,18 @@ public final class Recorder {
         }
         Map<String, Row> read = new LinkedHashMap<>();
         Set<String> containers = new HashSet<>();
+        seenNames.clear();
         try {
             readItems(client, profile, now, read, containers);
         } catch (ConcurrentModificationException e) {
             syncWanted = true; // SkyblockAPI changed a list while it was copied; try again shortly
             return;
         }
+        // Sack IDs carry no name; the ID stands in until the repository has one.
+        for (Row row : read.values()) {
+            if (ReferenceData.item(row.sbId()) == null) seenNames.putIfAbsent(row.sbId(), row.sbId());
+        }
+        ReferenceData.observe(seenNames);
 
         // Diff, only inside containers this read covered: a container SkyblockAPI knows nothing about yet keeps
         // its stored rows.
@@ -345,6 +355,7 @@ public final class Recorder {
         String id = SkyblockIds.of(stack);
         if (id.isEmpty()) return;
         out.put(Store.key(profile, container, slot), new Row(id, stack.getCount(), seen, SOURCE, true));
+        if (ReferenceData.item(id) == null) seenNames.putIfAbsent(id, stack.getHoverName().getString());
     }
 
     private static Map<String, Currency> currencyChanges(String profile, long now) {

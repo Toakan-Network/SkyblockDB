@@ -3,9 +3,14 @@ package skyblockdb;
 import skyblockdb.api.Currency;
 import skyblockdb.api.HistoryPoint;
 import skyblockdb.api.ItemCount;
+import skyblockdb.api.Observation;
 import skyblockdb.api.Profile;
+import skyblockdb.api.Recipe;
+import skyblockdb.api.ReferenceChange;
+import skyblockdb.api.ReferenceItem;
 import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.api.SkyblockDbListener;
+import skyblockdb.reference.ReferenceData;
 import skyblockdb.store.Store;
 
 import java.time.Instant;
@@ -170,6 +175,59 @@ public final class ApiImpl implements SkyblockDbApi {
                 if (at >= from) points.add(new HistoryPoint(profile, sbId, Instant.ofEpochMilli(at), e.getValue()));
             }
             return List.copyOf(points);
+        });
+    }
+
+    @Override
+    public Optional<ReferenceItem> item(String sbId) {
+        return Optional.ofNullable(ReferenceData.item(sbId));
+    }
+
+    @Override
+    public Map<String, ReferenceItem> referenceItems() {
+        return ReferenceData.items();
+    }
+
+    @Override
+    public List<Recipe> recipes(String sbId) {
+        return ReferenceData.recipes(sbId);
+    }
+
+    @Override
+    public List<Recipe> usages(String sbId) {
+        return ReferenceData.usages(sbId);
+    }
+
+    @Override
+    public CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since) {
+        String from = since == null ? "" : String.format("%013d", since.toEpochMilli());
+        return Store.get().query(store -> {
+            List<ReferenceChange> out = new ArrayList<>();
+            var cursor = store.referenceChanges().cursor(from);
+            while (cursor.hasNext()) {
+                String key = cursor.next();
+                Object[] v = cursor.getValue();
+                long at = Long.parseLong(key.substring(0, key.indexOf(Store.SEP)));
+                out.add(new ReferenceChange(Instant.ofEpochMilli(at), (String) v[0], (String) v[1], (String) v[2],
+                    (String) v[3], (String) v[4], (String) v[5], (String) v[6]));
+            }
+            return List.copyOf(out);
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<Observation>> observations(boolean openOnly) {
+        return Store.get().query(store -> {
+            List<Observation> out = new ArrayList<>();
+            store.observations().forEach((key, v) -> {
+                int sep = key.lastIndexOf(Store.SEP);
+                long resolved = (Long) v[4];
+                if (openOnly && resolved != 0L) return;
+                out.add(new Observation(key.substring(0, sep), key.substring(sep + 1), (String) v[0],
+                    Instant.ofEpochMilli((Long) v[1]), Instant.ofEpochMilli((Long) v[2]), ((Long) v[3]).intValue(),
+                    resolved == 0L ? null : Instant.ofEpochMilli(resolved)));
+            });
+            return List.copyOf(out);
         });
     }
 
