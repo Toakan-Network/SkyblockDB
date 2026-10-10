@@ -89,6 +89,14 @@ final class Table<V> extends TreeMap<String, V> {
         super.clear();
     }
 
+    /** Empties the table and deletes its file (for a log that is switched off). */
+    void discard(Path dir) throws IOException {
+        super.clear();
+        appended.clear();
+        dirty = false;
+        Files.deleteIfExists(file(dir));
+    }
+
     boolean dirty() {
         return dirty;
     }

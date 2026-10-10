@@ -67,7 +67,11 @@ public interface SkyblockDbApi {
 
     Map<String, Currency> currencies(String profile);
 
-    /** How an item's total changed on a profile since {@code since}, oldest first. */
+    /**
+     * How an item's total changed on a profile since {@code since}, oldest first. History is off by default, for
+     * debugging only: it records while the player has {@code /skyblockdb history on} or {@code /skyblockdb debug}
+     * on. Otherwise this is empty.
+     */
     CompletableFuture<List<HistoryPoint>> history(String profile, String sbId, Instant since);
 
     // Reference data (API_VERSION 2). Empty until the item repository has loaded once (then kept between sessions).

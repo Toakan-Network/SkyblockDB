@@ -404,7 +404,9 @@ public final class Recorder {
             if (profileRow != null) store.profiles().put(profile, profileRow);
             for (Map.Entry<String, Row> e : puts) store.itemCounts().put(e.getKey(), e.getValue().encode());
             for (String key : removes) store.itemCounts().remove(key);
-            totals.forEach((id, total) -> store.history().put(Store.historyKey(profile, id, now), total));
+            if (store.recordHistory()) {
+                totals.forEach((id, total) -> store.history().put(Store.historyKey(profile, id, now), total));
+            }
             currencyChanges.forEach((key, c) -> store.currencies().put(key, new Object[]{c.value(), now}));
         });
     }

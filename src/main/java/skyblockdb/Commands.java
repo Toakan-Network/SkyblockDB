@@ -14,8 +14,9 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 /**
- * {@code /skyblockdb status} (what is stored), {@code /skyblockdb item <ID>} (where an item is, via the API) and
- * {@code /skyblockdb debug} (toggle diagnostic logging).
+ * {@code /skyblockdb status} (what is stored), {@code /skyblockdb item <ID>} (where an item is, via the API),
+ * {@code /skyblockdb history [on|off]} (item history, off by default) and {@code /skyblockdb debug} (toggle
+ * diagnostic logging).
  */
 final class Commands {
     private Commands() {}
@@ -54,10 +55,28 @@ final class Commands {
                     }
                     return 1;
                 })))
+                .then(literal("history")
+                    .executes(context -> {
+                        String state = Store.get().historySwitchedOn() ? "on"
+                            : SkyblockDb.debugLogging ? "on while debug logging is on (removed at the next start)"
+                            : "off (turn on with /skyblockdb history on)";
+                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " history is " + state).withStyle(ChatFormatting.GOLD));
+                        return 1;
+                    })
+                    .then(literal("on").executes(context -> {
+                        Store.get().setRecordHistory(true);
+                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " history on: item totals are logged from now on").withStyle(ChatFormatting.GOLD));
+                        return 1;
+                    }))
+                    .then(literal("off").executes(context -> {
+                        Store.get().setRecordHistory(false);
+                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " history off: the log is removed at the next start").withStyle(ChatFormatting.GOLD));
+                        return 1;
+                    })))
                 .then(literal("debug").executes(context -> {
                     SkyblockDb.debugLogging = !SkyblockDb.debugLogging;
                     context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " debug logging "
-                        + (SkyblockDb.debugLogging ? "on" : "off")).withStyle(ChatFormatting.GOLD));
+                        + (SkyblockDb.debugLogging ? "on, history too (until the next start)" : "off")).withStyle(ChatFormatting.GOLD));
                     return 1;
                 }))
         ));

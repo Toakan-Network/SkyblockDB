@@ -8,7 +8,7 @@ SkyblockDB does the reading so other mods don't have to. It is built on [Skybloc
 which reads SkyBlock data, and adds what SkyblockAPI doesn't:
 - data from past sessions and other profiles, kept between game starts
 - one ID spelling for every source (the item repository's)
-- a history of how your item totals changed
+- optionally, for debugging, a history of how your item totals changed
 - reference data (items, pets, recipes) that stays current, with a changelog of what the repository changed
 - a plain-Java API, so other mods need neither SkyblockAPI nor Kotlin
 
@@ -41,8 +41,13 @@ SkyBlock. Recording starts by itself.
 Storage SkyblockAPI hasn't seen yet isn't known: open it once. SkyblockAPI remembers what it saw before, also while
 another mod was using it, so some storage may be known from the start.
 
-Only differences are written. A change in an item's total across all containers adds a history entry. The first
-sync adds one entry per item as the starting point.
+Only differences are written. SkyblockDB keeps what you have now, not a record of past amounts.
+
+### History (off by default)
+For debugging, SkyblockDB can also log each change in an item's total across all containers. It is off by default
+because it only grows and nothing else needs it. It records while `/skyblockdb history on` is set (remembered between
+starts) or while `/skyblockdb debug` is on (for that session only). When history is off at startup, the old log is
+deleted. The first sync with history on adds one entry per item as a starting point.
 
 ### Reference data and observations
 When SkyblockAPI's item repository reloads, SkyblockDB rebuilds the items and recipes and compares them with what it
@@ -59,7 +64,8 @@ name it saw, at most once per game session. When a later repository update adds 
 - `/skyblockdb status`: how many profiles, item rows, currency values and history entries are stored.
 - `/skyblockdb item <ID>`: where an item is on your current profile, its name and how many recipes make or use it,
   e.g. `/skyblockdb item ENCHANTED_COAL`. It goes through the public API, like another mod would.
-- `/skyblockdb debug`: turn diagnostic logging in `latest.log` on or off.
+- `/skyblockdb history [on|off]`: show or switch the item history (off by default, see above).
+- `/skyblockdb debug`: turn diagnostic logging in `latest.log` on or off. While it is on, history is recorded too.
 
 ## SkyBlock only
 Recording runs only while the Hypixel Mod API reports you are on SkyBlock. Lobbies and other servers never change
@@ -78,7 +84,7 @@ As Hypixel states, every modification is used at your own risk.
 
 ## Where data is stored
 `config/skyblock-db/` in your game folder, as JSON files: one per table (`items.json`, `item_counts.json`, ...), and
-`.jsonl` logs for the history and the reference changes. Their layout is internal and can change between versions,
+`.jsonl` logs for the reference changes and, when it is on, the history. Their layout is internal and can change between versions,
 so other mods and tools should use the API, not the files. Together they stay small, a few MB.
 
 Changes are saved within 5 seconds, and when the game closes. Each file is replaced in one step and the logs are only
@@ -154,7 +160,8 @@ the client thread before touching the game:
 db.history(profile, "ENCHANTED_COAL", Instant.now().minus(Duration.ofDays(7)))
   .thenAccept(points -> Minecraft.getInstance().execute(() -> showGraph(points)));
 ```
-- `history(profile, sbId, since)`: an item's total after each change, oldest first.
+- `history(profile, sbId, since)`: an item's total after each change, oldest first. Empty unless the player has
+  history on (see [History](#history-off-by-default)).
 - `referenceChanges(since)`: what changed in the reference data (added, changed, retired, restored, removed,
   confirmed).
 - `observations(openOnly)`: IDs seen in game that the repository doesn't have (yet).

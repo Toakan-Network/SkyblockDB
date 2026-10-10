@@ -24,11 +24,12 @@ import java.util.function.Function;
  *
  * <p>Tables, keys joined with {@link #SEP} (see {@link Table} for the file formats):
  * <ul>
- *   <li>{@code meta}: {@code schema_version}, the reference hash and repo SHA.</li>
+ *   <li>{@code meta}: {@code schema_version}, the reference hash and repo SHA, {@code history_enabled}.</li>
  *   <li>{@code profiles}: profile UUID -> [player UUID, profile name, profile type, SkyBlock level, seen at].</li>
  *   <li>{@code item_counts}: profile|container|slot -> [SkyBlock ID, amount, seen at, source, confident].</li>
  *   <li>{@code currencies}: profile|currency -> [value, seen at].</li>
- *   <li>{@code history} (log): profile|SkyBlock ID|epoch ms (13 digits) -> total amount after the change.</li>
+ *   <li>{@code history} (log, only while switched on): profile|SkyBlock ID|epoch ms (13 digits) -> total amount
+ *       after the change.</li>
  *   <li>{@code items}: SkyBlock ID -> [name, rarity, category, origin (repo/observed), retired at (0: current)].</li>
  *   <li>{@code recipes}: type|output|n -> [output count, inputs "ID*n;ID*n" (sorted), coins, seconds, npc].</li>
  *   <li>{@code reference_changes} (log): epoch ms (13 digits)|sequence (6) -> [SkyBlock ID, kind, change, field,
@@ -44,6 +45,8 @@ public final class Store {
     public static final String SEP = "|";
     /** Changes reach disk at most this long after they were made (a crash loses at most this much). */
     private static final int SAVE_DELAY_SECONDS = 5;
+    /** Meta key of the history switch ("true" when on). */
+    private static final String HISTORY_SETTING = "history_enabled";
 
     private static final Store INSTANCE = new Store();
 
@@ -62,6 +65,8 @@ public final class Store {
     /** Null until opened, or when opening failed. */
     private Path dir;
     private boolean saveScheduled = false;
+    /** Whether item history is recorded. Off by default; read from any thread. */
+    private volatile boolean recordHistory = false;
     private final Table<String> meta = new Table<>("meta", false);
     private final Table<Object[]> profiles = new Table<>("profiles", false);
     private final Table<Object[]> itemCounts = new Table<>("item_counts", false);
@@ -91,7 +96,19 @@ public final class Store {
                 if (Files.deleteIfExists(folder.resolve("skyblock.mv.db"))) {
                     SkyblockDb.LOGGER.info("SkyblockDB: replaced the old store file with JSON files; recording starts afresh");
                 }
-                for (Table<?> table : tables) table.load(folder);
+                meta.load(folder);
+                recordHistory = "true".equals(meta.get(HISTORY_SETTING));
+                for (Table<?> table : tables) {
+                    if (table == meta) continue;
+                    // History is off by default (only useful for debugging); a log left from when it was on goes.
+                    if (table == history && !recordHistory()) {
+                        boolean had = Files.exists(folder.resolve("history.jsonl"));
+                        history.discard(folder);
+                        if (had) SkyblockDb.LOGGER.info("SkyblockDB: history is off; removed the old history log");
+                        continue;
+                    }
+                    table.load(folder);
+                }
                 dir = folder;
                 migrate();
                 saveSoon();
@@ -165,6 +182,25 @@ public final class Store {
                 SkyblockDb.LOGGER.error("SkyblockDB: could not save {}", table, e);
             }
         }
+    }
+
+    /** True while item history is recorded: switched on ({@code /skyblockdb history on}), or debug logging is on. */
+    public boolean recordHistory() {
+        return recordHistory || SkyblockDb.debugLogging;
+    }
+
+    /** True when history is switched on itself, not just by debug logging. */
+    public boolean historySwitchedOn() {
+        return recordHistory;
+    }
+
+    /** Switches history recording and remembers the choice. Turning it off keeps the log until the next start. */
+    public void setRecordHistory(boolean on) {
+        recordHistory = on;
+        write(store -> {
+            if (on) meta.put(HISTORY_SETTING, "true");
+            else meta.remove(HISTORY_SETTING);
+        });
     }
 
     public static String key(String... parts) {
