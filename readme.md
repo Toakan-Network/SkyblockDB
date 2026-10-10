@@ -179,7 +179,7 @@ Everything except the three future-returning methods above reads from memory and
 are immutable.
 
 ### IDs and containers
-- SkyBlock IDs use the item repository's spelling: pets are `TYPE;tier` (`BEE;4` is a Legendary Bee, tiers 0-5 are
+- SkyBlock IDs use NotEnoughUpdates' spelling: pets are `TYPE;tier` (`BEE;4` is a Legendary Bee, tiers 0-5 are
   Common to Mythic), item variants use a dash (`INK_SACK-3`).
 - Recipe inputs also use `SKYBLOCK_COIN` and `SKYBLOCK_<CURRENCY>` for currencies, and `ID;level` for enchantments,
   potions and runes.

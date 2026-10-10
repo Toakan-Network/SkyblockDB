@@ -119,6 +119,9 @@ public interface SkyblockDbApi {
     /** What an NPC pays for one {@code sbId}, from Hypixel's item list; empty when unknown (API_VERSION 4). */
     OptionalDouble npcSellPrice(String sbId);
 
+    /** Every NPC sell price by SkyBlock ID, including items the repository doesn't list (API_VERSION 4). */
+    Map<String, Double> npcSellPrices();
+
     /** Mayor and minister, live; empty until SkyblockAPI knows them (API_VERSION 4). */
     Optional<Election> election();
 

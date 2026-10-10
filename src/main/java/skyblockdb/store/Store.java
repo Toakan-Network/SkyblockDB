@@ -31,7 +31,8 @@ import java.util.function.Function;
  *   <li>{@code history} (log, only while switched on): profile|SkyBlock ID|epoch ms (13 digits) -> total amount
  *       after the change.</li>
  *   <li>{@code items}: SkyBlock ID -> [name, rarity, category, origin (repo/observed), retired at (0: current)].</li>
- *   <li>{@code recipes}: type|output|n -> [output count, inputs "ID*n;ID*n" (sorted), coins, seconds, npc].</li>
+ *   <li>{@code recipes}: type|output|n (3 digits, repository order) -> [output count, inputs "ID*n,ID*n" (sorted),
+ *       coins, seconds, npc].</li>
  *   <li>{@code reference_changes} (log): epoch ms (13 digits)|sequence (6) -> [SkyBlock ID, kind, change, field,
  *       old, new, repo SHA].</li>
  *   <li>{@code observations}: SkyBlock ID|kind -> [seen value, first seen, last seen, sessions, resolved at (0: open)].</li>
@@ -43,7 +44,7 @@ import java.util.function.Function;
  */
 public final class Store {
     /** Bump when the layout changes, and add a step to {@link #migrate}. */
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
     /** Key separator. Never part of a UUID, container name, currency name or SkyBlock ID. */
     public static final String SEP = "|";
     /** Changes reach disk at most this long after they were made (a crash loses at most this much). */
@@ -135,7 +136,13 @@ public final class Store {
         }
         // 4: JSON files (schemas 1-3 were the MVStore file, which is not carried over). 5: requirements, attributes
         // and npc_prices, which fill on the next repository load (the reference hash covers them, so it differs).
+        // 6: recipe inputs joined with ',' (';' broke pet and enchantment keys) and numbered in repository order;
+        // recipes are emptied, so the next load stores them again as a baseline.
         // Later steps go here, in order.
+        if (version >= 4 && version < 6) {
+            recipes.clear();
+            meta.remove("reference_hash");
+        }
         if (version != SCHEMA_VERSION) meta.put("schema_version", Integer.toString(SCHEMA_VERSION));
     }
 

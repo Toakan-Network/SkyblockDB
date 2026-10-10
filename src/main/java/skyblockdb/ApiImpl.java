@@ -246,6 +246,11 @@ public final class ApiImpl implements SkyblockDbApi {
     }
 
     @Override
+    public Map<String, Double> npcSellPrices() {
+        return ReferenceData.npcSellPrices();
+    }
+
+    @Override
     public Optional<Election> election() {
         return ElectionReader.current();
     }

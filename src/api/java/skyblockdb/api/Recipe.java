@@ -3,7 +3,8 @@ package skyblockdb.api;
 import java.util.Map;
 
 /**
- * One way to make an item, from the item repository.
+ * One way to make an item, from the item repository. Several recipes for one item come in the repository's order;
+ * the first is the usual one.
  *
  * @param type        {@code crafting}, {@code forge}, {@code shop} or {@code kat}
  * @param output      canonical SkyBlock ID made

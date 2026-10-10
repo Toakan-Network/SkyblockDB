@@ -182,6 +182,10 @@ public final class ReferenceData {
         return view.attributes();
     }
 
+    public static Map<String, Double> npcSellPrices() {
+        return view.prices();
+    }
+
     /** NPC sell price, or null when unknown. */
     public static Double npcSellPrice(String sbId) {
         return view.prices().get(sbId);
@@ -258,13 +262,13 @@ public final class ReferenceData {
             inputs.add(r.input());
             addRecipe(recipeLists, "kat", r.output(), inputs, r.coins(), r.time(), "");
         }
-        // Several recipes for one output: numbered in sorted order, so the keys don't move between builds.
+        // Several recipes for one output: numbered in the repository's order (the first is the usual one), padded so
+        // the keys sort in that order.
         Map<String, Object[]> recipes = new TreeMap<>();
         recipeLists.forEach((typeAndOutput, list) -> {
-            list.sort((a, b) -> String.join("\u0000", a).compareTo(String.join("\u0000", b)));
             for (int i = 0; i < list.size(); i++) {
                 String[] r = list.get(i);
-                recipes.put(typeAndOutput + Store.SEP + i,
+                recipes.put(typeAndOutput + Store.SEP + String.format("%03d", i),
                     new Object[]{Long.parseLong(r[0]), r[1], Long.parseLong(r[2]), Long.parseLong(r[3]), r[4]});
             }
         });
@@ -396,7 +400,8 @@ public final class ReferenceData {
         if (amounts.isEmpty() && coins <= 0) return;
         StringBuilder encoded = new StringBuilder();
         amounts.forEach((id, n) -> {
-            if (!encoded.isEmpty()) encoded.append(';');
+            // ',' between inputs: keys can hold ';' (pets "BEE;4", enchantments "ID;level").
+            if (!encoded.isEmpty()) encoded.append(',');
             encoded.append(id).append('*').append(n);
         });
         target.computeIfAbsent(type + Store.SEP + out, k -> new ArrayList<>()).add(new String[]{
@@ -474,7 +479,9 @@ public final class ReferenceData {
             changedItems.add(e.getKey());
         }
 
-        // Recipes: compared per type|output, as the set of its recipes.
+        // Recipes: compared per type|output, as the set of its recipes (a new order alone is no change). The first
+        // load of recipes, also after an upgrade to schema 6, is a baseline.
+        boolean recipeBaseline = store.recipes().isEmpty();
         Map<String, List<String>> freshByOutput = groupRecipes(recipes);
         Map<String, List<String>> oldByOutput = groupRecipes(store.recipes());
         Set<String> outputs = new HashSet<>(freshByOutput.keySet());
@@ -487,13 +494,13 @@ public final class ReferenceData {
             String type = typeAndOutput.substring(0, sep);
             String output = typeAndOutput.substring(sep + 1);
             String what = old.isEmpty() ? "added" : fresh.isEmpty() ? "removed" : "changed";
-            if (!baseline) change(store, now, output, "recipe:" + type, what, "recipes", String.join(" | ", old), String.join(" | ", fresh), sha);
+            if (!baseline && !recipeBaseline) {
+                change(store, now, output, "recipe:" + type, what, "recipes", String.join(" | ", old), String.join(" | ", fresh), sha);
+            }
             changedRecipeIds.add(output);
         }
-        if (!changedRecipeIds.isEmpty() || baseline) {
-            store.recipes().clear();
-            store.recipes().putAll(recipes);
-        }
+        // Rewritten also when only the order changed, so the stored order stays the repository's.
+        boolean recipesReplaced = replaceIfDifferent(store.recipes(), recipes);
 
         // Mobs: compared as a whole per mob. The first load of mobs (also after an upgrade to schema 3) is a baseline.
         boolean mobBaseline = store.mobs().isEmpty();
@@ -529,7 +536,7 @@ public final class ReferenceData {
 
         Set<String> kinds = new HashSet<>();
         if (!changedItems.isEmpty() || baseline) kinds.add("items");
-        if (!changedRecipeIds.isEmpty() || baseline) kinds.add("recipes");
+        if (recipesReplaced || baseline) kinds.add("recipes");
         if (!changedMobs.isEmpty()) kinds.add("mobs");
         kinds.addAll(changedExtras);
         Set<String> ids = new HashSet<>(changedItems);
@@ -555,11 +562,12 @@ public final class ReferenceData {
         return true;
     }
 
-    /** type|output -> the encoded recipes, in key order. */
+    /** type|output -> its recipes as text, sorted, so two builds compare as sets. */
     private static Map<String, List<String>> groupRecipes(Map<String, Object[]> recipes) {
         Map<String, List<String>> out = new TreeMap<>();
         new TreeMap<>(recipes).forEach((key, v) -> out.computeIfAbsent(key.substring(0, key.lastIndexOf(Store.SEP)),
             k -> new ArrayList<>()).add(v[0] + "x <- " + v[1] + " +" + v[2] + "c " + v[3] + "s " + v[4]));
+        out.values().forEach(java.util.Collections::sort);
         return out;
     }
 
@@ -621,7 +629,7 @@ public final class ReferenceData {
             String type = key.substring(0, first);
             String output = key.substring(first + 1, key.lastIndexOf(Store.SEP));
             Map<String, Integer> inputs = new LinkedHashMap<>();
-            for (String part : ((String) v[1]).split(";")) {
+            for (String part : ((String) v[1]).split(",")) {
                 int star = part.lastIndexOf('*');
                 if (star > 0) inputs.put(part.substring(0, star), Integer.parseInt(part.substring(star + 1)));
             }
