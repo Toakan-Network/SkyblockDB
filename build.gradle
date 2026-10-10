@@ -1,0 +1,90 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version '1.17.21'
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	maven { url = "https://repo.hypixel.net/repository/Hypixel/" }
+	// SkyblockAPI (ThatGravyBoat): sacks, storage, profile and repo data, bundled below.
+	maven {
+		url = "https://maven.teamresourceful.com/repository/maven-public/"
+		content { excludeModule("tech.thatgravyboat", "skyblock-api") }
+	}
+	// SkyblockAPI's own jars, fetched as plain files: its Gradle variant metadata would pick one Minecraft build,
+	// and we bundle two (26.2 and 26.3).
+	exclusiveContent {
+		forRepository {
+			ivy {
+				name = "SkyblockAPI jars"
+				url = "https://maven.teamresourceful.com/repository/maven-public/"
+				patternLayout {
+					artifact "[organisation]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"
+					m2compatible = true
+				}
+				metadataSources { artifact() }
+			}
+		}
+		filter { includeModule("tech.thatgravyboat", "skyblock-api") }
+	}
+	mavenCentral()
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+	// Official Hypixel Mod API, used for SkyBlock detection. Required at runtime ("depends" in
+	// fabric.mod.json); players install the hypixel-mod-api mod themselves, so it is compile-only, not bundled.
+	compileOnly "net.hypixel:mod-api:1.0.2"
+
+	// SkyblockAPI: the data source. One build per Minecraft version; both are bundled with Jar-in-Jar and
+	// Fabric loads the one that matches (and the newest copy when other mods bundle it too). Needs
+	// fabric-language-kotlin. Compiled against the 26.2 build, the lower bound: only use classes in both.
+	implementation "tech.thatgravyboat:skyblock-api:4.2.37:26.2@jar"
+	include "tech.thatgravyboat:skyblock-api:4.2.37:26.2@jar"
+	include "tech.thatgravyboat:skyblock-api:4.2.37:26.3@jar"
+	// Compile against what SkyblockAPI exposes: Repo-Lib (nested in its jar) and the Kotlin standard library
+	// (from fabric-language-kotlin, installed by the player).
+	compileOnly "tech.thatgravyboat.repo-lib:repo-lib:4.1.11"
+	compileOnly "org.jetbrains.kotlin:kotlin-stdlib:2.4.0"
+
+	// MVStore (from H2): the internal store, pure Java and about 370 KB. Bundled with Jar-in-Jar.
+	implementation "com.h2database:h2-mvstore:2.5.252"
+	include "com.h2database:h2-mvstore:2.5.252"
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": project.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			artifactId = project.archives_base_name
+			from components.java
+		}
+	}
+}
