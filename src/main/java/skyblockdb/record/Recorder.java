@@ -5,7 +5,11 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import skyblockdb.ApiImpl;
 import skyblockdb.SkyblockDb;
+import skyblockdb.api.Currency;
+import skyblockdb.api.ItemCount;
+import skyblockdb.api.Profile;
 import skyblockdb.SkyblockDetector;
 import skyblockdb.store.Store;
 import tech.thatgravyboat.skyblockapi.api.SkyBlockAPI;
@@ -23,6 +27,7 @@ import tech.thatgravyboat.skyblockapi.api.profile.items.storage.StorageAPI;
 import tech.thatgravyboat.skyblockapi.api.profile.items.vault.VaultAPI;
 import tech.thatgravyboat.skyblockapi.api.profile.profile.ProfileAPI;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
@@ -70,7 +75,9 @@ public final class Recorder {
     /** Stored item rows by profile|container|slot. */
     private static final Map<String, Row> rows = new HashMap<>();
     /** Stored currency values by profile|currency. */
-    private static final Map<String, Double> currencies = new HashMap<>();
+    private static final Map<String, Currency> currencies = new HashMap<>();
+    /** The profile the API calls current; null off SkyBlock. */
+    private static String current;
     /** Last profile row written per profile, without its time, so unchanged profiles aren't rewritten. */
     private static final Map<String, String> profileSignatures = new HashMap<>();
     private static boolean syncWanted = false;
@@ -85,11 +92,22 @@ public final class Recorder {
             // Writer thread: copy what is stored, then hand it to the client thread.
             Map<String, Row> storedRows = new HashMap<>();
             store.itemCounts().forEach((k, v) -> storedRows.put(k, Row.decode(v)));
-            Map<String, Double> storedCurrencies = new HashMap<>();
-            store.currencies().forEach((k, v) -> storedCurrencies.put(k, ((Number) v[0]).doubleValue()));
+            Map<String, Currency> storedCurrencies = new HashMap<>();
+            store.currencies().forEach((k, v) -> storedCurrencies.put(k, currency(k, ((Number) v[0]).doubleValue(), (Long) v[1])));
+            List<Profile> storedProfiles = new ArrayList<>();
+            store.profiles().forEach((k, v) -> storedProfiles.add(new Profile(k, (String) v[0], (String) v[1],
+                (String) v[2], ((Long) v[3]).intValue(), Instant.ofEpochMilli((Long) v[4]))));
             Minecraft.getInstance().execute(() -> {
                 rows.putAll(storedRows);
                 currencies.putAll(storedCurrencies);
+                Set<String> known = new HashSet<>();
+                for (String key : rows.keySet()) known.add(key.substring(0, key.indexOf(Store.SEP)));
+                for (String key : currencies.keySet()) known.add(key.substring(0, key.indexOf(Store.SEP)));
+                for (Profile p : storedProfiles) {
+                    ApiImpl.INSTANCE.publishProfile(p);
+                    profileSignatures.put(p.profileUuid(), signature(p.playerUuid(), p.name(), p.type(), p.sbLevel()));
+                }
+                known.forEach(Recorder::publish);
                 loaded = true;
                 syncWanted = true;
             });
@@ -109,6 +127,7 @@ public final class Recorder {
         boolean onSkyblock = SkyblockDetector.isOnSkyblock();
         if (onSkyblock && !wasOnSkyblock) syncWanted = true;
         wasOnSkyblock = onSkyblock;
+        if (!onSkyblock && current != null) setCurrent(null);
         if (!loaded || !onSkyblock) return;
         ticksSinceSync++;
         if (syncWanted && ticksSinceSync >= MIN_SYNC_INTERVAL_TICKS) {
@@ -132,10 +151,14 @@ public final class Recorder {
     private static void sync(Minecraft client, boolean items) {
         String profile = profile();
         if (profile == null) return;
+        if (!profile.equals(current)) setCurrent(profile);
         long now = System.currentTimeMillis();
-        Map<String, Double> currencyChanges = currencyChanges(profile);
+        Map<String, Currency> currencyChanges = currencyChanges(profile, now);
         if (!items) {
-            if (!currencyChanges.isEmpty()) submit(profile, now, null, List.of(), List.of(), Map.of(), currencyChanges);
+            if (!currencyChanges.isEmpty()) {
+                submit(profile, now, null, List.of(), List.of(), Map.of(), currencyChanges);
+                publishAndFire(profile, Set.of(), currencyChanges.keySet(), false);
+            }
             return;
         }
         Map<String, Row> read = new LinkedHashMap<>();
@@ -151,6 +174,7 @@ public final class Recorder {
         // its stored rows.
         Map<String, Row> puts = new LinkedHashMap<>();
         List<String> removes = new ArrayList<>();
+        Set<String> changedIds = new HashSet<>();
         Map<String, Long> before = new HashMap<>();
         Map<String, Long> after = new HashMap<>();
         String profilePrefix = profile + Store.SEP;
@@ -160,9 +184,14 @@ public final class Recorder {
             if (containers.contains(containerOf(e.getKey())) && !read.containsKey(e.getKey())) removes.add(e.getKey());
         }
         read.forEach((key, row) -> {
-            if (!row.sameAs(rows.get(key))) puts.put(key, row);
+            Row old = rows.get(key);
+            if (!row.sameAs(old)) {
+                puts.put(key, row);
+                changedIds.add(row.sbId());
+                if (old != null) changedIds.add(old.sbId());
+            }
         });
-        removes.forEach(rows::remove);
+        for (String key : removes) changedIds.add(rows.remove(key).sbId());
         rows.putAll(puts);
         for (Map.Entry<String, Row> e : rows.entrySet()) {
             if (e.getKey().startsWith(profilePrefix)) after.merge(e.getValue().sbId(), e.getValue().amount(), Long::sum);
@@ -175,19 +204,75 @@ public final class Recorder {
             if (total != before.getOrDefault(id, 0L)) totals.put(id, total);
         }
 
-        Object[] profileRow = new Object[]{
-            playerUuid(client), Objects.toString(ProfileAPI.INSTANCE.getProfileName(), ""),
-            Objects.toString(ProfileAPI.INSTANCE.getProfileType(), ""), (long) ProfileAPI.INSTANCE.getSbLevel(), now};
+        String player = playerUuid(client);
+        String name = Objects.toString(ProfileAPI.INSTANCE.getProfileName(), "");
+        String type = Objects.toString(ProfileAPI.INSTANCE.getProfileType(), "");
+        int level = ProfileAPI.INSTANCE.getSbLevel();
+        Object[] profileRow = new Object[]{player, name, type, (long) level, now};
         // Written only when something in it (other than the time) changed.
-        String signature = profileRow[0] + Store.SEP + profileRow[1] + Store.SEP + profileRow[2] + Store.SEP + profileRow[3];
-        if (signature.equals(profileSignatures.put(profile, signature))) profileRow = null;
+        String signature = signature(player, name, type, level);
+        boolean profileChanged = !signature.equals(profileSignatures.put(profile, signature));
+        if (profileChanged) {
+            ApiImpl.INSTANCE.publishProfile(new Profile(profile, player, name, type, level, Instant.ofEpochMilli(now)));
+        } else {
+            profileRow = null;
+        }
         if (puts.isEmpty() && removes.isEmpty() && currencyChanges.isEmpty()) {
-            if (profileRow != null) submit(profile, now, profileRow, List.of(), List.of(), Map.of(), Map.of());
+            if (profileRow != null) {
+                submit(profile, now, profileRow, List.of(), List.of(), Map.of(), Map.of());
+                ApiImpl.INSTANCE.fire(l -> l.onProfileChanged(profile));
+            }
             return;
         }
         SkyblockDb.debug("Sync: {} changed, {} removed, {} totals, {} currencies",
             puts.size(), removes.size(), totals.size(), currencyChanges.size());
         submit(profile, now, profileRow, new ArrayList<>(puts.entrySet()), removes, totals, currencyChanges);
+        publishAndFire(profile, changedIds, currencyChanges.keySet(), profileChanged);
+    }
+
+    private static String signature(String player, String name, String type, int level) {
+        return player + Store.SEP + name + Store.SEP + type + Store.SEP + level;
+    }
+
+    private static Currency currency(String key, double value, long seenAt) {
+        int sep = key.indexOf(Store.SEP);
+        return new Currency(key.substring(0, sep), key.substring(sep + 1), value, Instant.ofEpochMilli(seenAt));
+    }
+
+    private static void setCurrent(String profile) {
+        current = profile;
+        ApiImpl.INSTANCE.setCurrent(profile);
+        if (profile != null) ApiImpl.INSTANCE.fire(l -> l.onProfileChanged(profile));
+    }
+
+    /** Rebuilds a profile's API view from the in-memory rows and currencies. */
+    private static void publish(String profile) {
+        String prefix = profile + Store.SEP;
+        List<ItemCount> items = new ArrayList<>();
+        rows.forEach((key, row) -> {
+            if (key.startsWith(prefix)) {
+                items.add(ApiImpl.itemCount(key, row.sbId(), row.amount(), row.seenAt(), row.source(), row.confident()));
+            }
+        });
+        ApiImpl.INSTANCE.publishItems(profile, items);
+        Map<String, Currency> values = new LinkedHashMap<>();
+        currencies.forEach((key, c) -> {
+            if (key.startsWith(prefix)) values.put(c.name(), c);
+        });
+        ApiImpl.INSTANCE.publishCurrencies(profile, values);
+    }
+
+    private static void publishAndFire(String profile, Set<String> changedIds, Set<String> currencyKeys, boolean profileChanged) {
+        publish(profile);
+        if (!changedIds.isEmpty()) {
+            Set<String> ids = Set.copyOf(changedIds);
+            ApiImpl.INSTANCE.fire(l -> l.onItemsChanged(profile, ids));
+        }
+        if (!currencyKeys.isEmpty()) {
+            Set<String> names = Set.copyOf(ApiImpl.currencyNames(currencyKeys));
+            ApiImpl.INSTANCE.fire(l -> l.onCurrenciesChanged(profile, names));
+        }
+        if (profileChanged) ApiImpl.INSTANCE.fire(l -> l.onProfileChanged(profile));
     }
 
     /** Container of a profile|container|slot key. */
@@ -262,7 +347,7 @@ public final class Recorder {
         out.put(Store.key(profile, container, slot), new Row(id, stack.getCount(), seen, SOURCE, true));
     }
 
-    private static Map<String, Double> currencyChanges(String profile) {
+    private static Map<String, Currency> currencyChanges(String profile, long now) {
         CurrencyAPI c = CurrencyAPI.INSTANCE;
         Map<String, Double> values = new LinkedHashMap<>();
         values.put("purse", c.getPurse());
@@ -276,10 +361,11 @@ public final class Recorder {
         values.put("north_stars", (double) c.getNorthStars());
         values.put("gems", (double) c.getGems());
         values.put("soulflow", (double) c.getSoulflow());
-        Map<String, Double> changes = new LinkedHashMap<>();
+        Map<String, Currency> changes = new LinkedHashMap<>();
         values.forEach((name, value) -> {
             String key = Store.key(profile, name);
-            if (!value.equals(currencies.get(key))) changes.put(key, value);
+            Currency old = currencies.get(key);
+            if (old == null || old.value() != value) changes.put(key, new Currency(profile, name, value, Instant.ofEpochMilli(now)));
         });
         currencies.putAll(changes);
         return changes;
@@ -291,13 +377,13 @@ public final class Recorder {
     }
 
     private static void submit(String profile, long now, Object[] profileRow, List<Map.Entry<String, Row>> puts,
-                               List<String> removes, Map<String, Long> totals, Map<String, Double> currencyChanges) {
+                               List<String> removes, Map<String, Long> totals, Map<String, Currency> currencyChanges) {
         Store.get().write(store -> {
             if (profileRow != null) store.profiles().put(profile, profileRow);
             for (Map.Entry<String, Row> e : puts) store.itemCounts().put(e.getKey(), e.getValue().encode());
             for (String key : removes) store.itemCounts().remove(key);
             totals.forEach((id, total) -> store.history().put(Store.historyKey(profile, id, now), total));
-            currencyChanges.forEach((key, value) -> store.currencies().put(key, new Object[]{value, now}));
+            currencyChanges.forEach((key, c) -> store.currencies().put(key, new Object[]{c.value(), now}));
         });
     }
 }

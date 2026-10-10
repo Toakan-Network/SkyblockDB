@@ -1,14 +1,22 @@
 package skyblockdb;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import skyblockdb.api.ItemCount;
+import skyblockdb.api.SkyblockDbApi;
+import skyblockdb.record.SkyblockIds;
 import skyblockdb.store.Store;
 
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
-/** {@code /skyblockdb status} (what is stored) and {@code /skyblockdb debug} (toggle diagnostic logging). */
+/**
+ * {@code /skyblockdb status} (what is stored), {@code /skyblockdb item <ID>} (where an item is, via the API) and
+ * {@code /skyblockdb debug} (toggle diagnostic logging).
+ */
 final class Commands {
     private Commands() {}
 
@@ -29,6 +37,20 @@ final class Commands {
                         });
                     return 1;
                 }))
+                // Goes through the public API, like another mod would.
+                .then(literal("item").then(argument("id", StringArgumentType.greedyString()).executes(context -> {
+                    String id = SkyblockIds.normalize(StringArgumentType.getString(context, "id"));
+                    SkyblockDbApi api = SkyblockDbApi.get().orElseThrow();
+                    if (api.currentProfile().isEmpty()) {
+                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": no SkyBlock profile yet").withStyle(ChatFormatting.RED));
+                        return 0;
+                    }
+                    context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": " + id + " x" + api.count(id)).withStyle(ChatFormatting.GOLD));
+                    for (ItemCount row : api.counts(id)) {
+                        context.getSource().sendFeedback(Component.literal("- " + row.container() + " slot " + row.slot() + ": " + row.amount()).withStyle(ChatFormatting.WHITE));
+                    }
+                    return 1;
+                })))
                 .then(literal("debug").executes(context -> {
                     SkyblockDb.debugLogging = !SkyblockDb.debugLogging;
                     context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " debug logging "

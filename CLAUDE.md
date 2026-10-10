@@ -19,7 +19,9 @@ saves about 5 MB per jar.
   `RepoEvent`).
 
 ## Design
-- The store is internal. Other mods use the public API, never the store file. A JSON export for outside tools
+- The store is internal. Other mods use the public API (`src/api/java`, package `skyblockdb.api`, plain Java with
+  no dependencies, `SkyblockDbApi.get()`), never the store file. Bump `API_VERSION` on additions; never remove
+  or change members outside a MAJOR. A JSON export for outside tools
   is planned.
 - The client thread never touches the store. Writes go through the single writer thread.
 - Plan: `C:\Users\thoma\.claude\plans\ok-so-this-db-luminous-snowflake.md`.
