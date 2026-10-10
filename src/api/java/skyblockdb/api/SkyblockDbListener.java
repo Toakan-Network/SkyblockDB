@@ -18,9 +18,13 @@ public interface SkyblockDbListener {
     default void onProfileChanged(String profile) {}
 
     /**
-     * Reference data changed (API_VERSION 2): {@code kinds} are {@code items}, {@code recipes} and/or {@code mobs}
-     * (mobs from API_VERSION 3), {@code ids} the SkyBlock or mob IDs affected. Also called once when the reference
+     * Reference data changed (API_VERSION 2): {@code kinds} are {@code items}, {@code recipes}, {@code mobs} (from
+     * API_VERSION 3), {@code requirements}, {@code attributes} and/or {@code prices} (from API_VERSION 4), {@code ids}
+     * the SkyBlock or mob IDs affected (empty for the last three: re-read what you use). Also called once when the reference
      * data first becomes readable in a session.
      */
     default void onReferenceDataChanged(Set<String> kinds, Set<String> ids) {}
+
+    /** The mayor or minister changed (API_VERSION 4); read {@link SkyblockDbApi#election()} for the new ones. */
+    default void onElectionChanged() {}
 }

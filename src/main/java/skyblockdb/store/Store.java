@@ -36,11 +36,14 @@ import java.util.function.Function;
  *       old, new, repo SHA].</li>
  *   <li>{@code observations}: SkyBlock ID|kind -> [seen value, first seen, last seen, sessions, resolved at (0: open)].</li>
  *   <li>{@code mobs}: mob ID -> [name, island, type, loot tables as JSON].</li>
+ *   <li>{@code requirements}: SkyBlock ID, pet or attribute ID -> [unlock line, ...].</li>
+ *   <li>{@code attributes}: attribute ID -> [name, shard ID, shard name, rarity].</li>
+ *   <li>{@code npc_prices}: SkyBlock ID -> [NPC sell price].</li>
  * </ul>
  */
 public final class Store {
     /** Bump when the layout changes, and add a step to {@link #migrate}. */
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
     /** Key separator. Never part of a UUID, container name, currency name or SkyBlock ID. */
     public static final String SEP = "|";
     /** Changes reach disk at most this long after they were made (a crash loses at most this much). */
@@ -77,8 +80,11 @@ public final class Store {
     private final Table<Object[]> referenceChanges = new Table<>("reference_changes", true);
     private final Table<Object[]> observations = new Table<>("observations", false);
     private final Table<Object[]> mobs = new Table<>("mobs", false);
+    private final Table<Object[]> requirements = new Table<>("requirements", false);
+    private final Table<Object[]> attributes = new Table<>("attributes", false);
+    private final Table<Object[]> npcPrices = new Table<>("npc_prices", false);
     private final List<Table<?>> tables = List.of(meta, profiles, itemCounts, currencies, history, items, recipes,
-        referenceChanges, observations, mobs);
+        referenceChanges, observations, mobs, requirements, attributes, npcPrices);
 
     private Store() {}
 
@@ -127,7 +133,9 @@ public final class Store {
         if (version > SCHEMA_VERSION) {
             throw new IllegalStateException("Store is schema " + version + ", newer than this mod (" + SCHEMA_VERSION + ")");
         }
-        // 4: JSON files (schemas 1-3 were the MVStore file, which is not carried over). Later steps go here, in order.
+        // 4: JSON files (schemas 1-3 were the MVStore file, which is not carried over). 5: requirements, attributes
+        // and npc_prices, which fill on the next repository load (the reference hash covers them, so it differs).
+        // Later steps go here, in order.
         if (version != SCHEMA_VERSION) meta.put("schema_version", Integer.toString(SCHEMA_VERSION));
     }
 
@@ -228,4 +236,7 @@ public final class Store {
     public NavigableMap<String, Object[]> referenceChanges() { return referenceChanges; }
     public NavigableMap<String, Object[]> observations() { return observations; }
     public NavigableMap<String, Object[]> mobs() { return mobs; }
+    public NavigableMap<String, Object[]> requirements() { return requirements; }
+    public NavigableMap<String, Object[]> attributes() { return attributes; }
+    public NavigableMap<String, Object[]> npcPrices() { return npcPrices; }
 }

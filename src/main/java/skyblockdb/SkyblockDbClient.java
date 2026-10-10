@@ -4,6 +4,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import skyblockdb.api.SkyblockDbApi;
+import skyblockdb.record.ElectionReader;
 import skyblockdb.record.Recorder;
 import skyblockdb.reference.ReferenceData;
 import skyblockdb.store.Store;
@@ -20,6 +21,7 @@ public final class SkyblockDbClient implements ClientModInitializer {
         });
         Recorder.register();
         ReferenceData.register();
+        ElectionReader.register();
         Commands.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> Store.get().close());
         SkyblockDb.LOGGER.info("{} loaded", SkyblockDb.NAME);

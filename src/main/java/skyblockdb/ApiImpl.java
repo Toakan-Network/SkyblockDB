@@ -3,7 +3,10 @@ package skyblockdb;
 import skyblockdb.api.Currency;
 import skyblockdb.api.HistoryPoint;
 import skyblockdb.api.ItemCount;
+import skyblockdb.api.Attribute;
+import skyblockdb.api.Election;
 import skyblockdb.api.Mob;
+import skyblockdb.api.Perk;
 import skyblockdb.api.Observation;
 import skyblockdb.api.Profile;
 import skyblockdb.api.Recipe;
@@ -11,6 +14,7 @@ import skyblockdb.api.ReferenceChange;
 import skyblockdb.api.ReferenceItem;
 import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.api.SkyblockDbListener;
+import skyblockdb.record.ElectionReader;
 import skyblockdb.reference.ReferenceData;
 import skyblockdb.store.Store;
 
@@ -22,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -212,6 +217,42 @@ public final class ApiImpl implements SkyblockDbApi {
     @Override
     public List<Mob> droppedBy(String key) {
         return ReferenceData.droppedBy(key);
+    }
+
+    @Override
+    public List<Recipe> allRecipes() {
+        return ReferenceData.allRecipes();
+    }
+
+    @Override
+    public List<String> requirements(String key) {
+        return ReferenceData.requirements(key);
+    }
+
+    @Override
+    public Optional<Attribute> attribute(String id) {
+        return Optional.ofNullable(ReferenceData.attribute(id));
+    }
+
+    @Override
+    public Map<String, Attribute> attributes() {
+        return ReferenceData.attributes();
+    }
+
+    @Override
+    public OptionalDouble npcSellPrice(String sbId) {
+        Double price = ReferenceData.npcSellPrice(sbId);
+        return price == null ? OptionalDouble.empty() : OptionalDouble.of(price);
+    }
+
+    @Override
+    public Optional<Election> election() {
+        return ElectionReader.current();
+    }
+
+    @Override
+    public Optional<Perk> activePerk(String id) {
+        return ElectionReader.activePerk(id);
     }
 
     @Override

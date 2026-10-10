@@ -138,6 +138,14 @@ argument use the current profile and return empty results while it isn't known (
 also has a `profile` (SkyBlock profile UUID) variant, and `profiles()` lists every recorded profile, including ones
 you aren't on now.
 
+Reference data beyond items and recipes:
+- `mob(id)`, `mobs()`, `droppedBy(sbId)`: mobs, their loot tables and what drops an item.
+- `allRecipes()`, `usages(sbId)`: every recipe, and the recipes that use an item.
+- `requirements(key)`: what unlocks an item's recipe, e.g. `["Coal III"]` for `ENCHANTED_COAL`.
+- `attribute(id)`, `attributes()`: Hunting attributes with their shard ID and name (recipes key attributes by ID).
+- `npcSellPrice(sbId)`: what an NPC pays, from Hypixel's item list.
+- `election()`, `activePerk(id)`: mayor and minister, live, e.g. `activePerk("MOLTEN_FORGE")` while Cole has it.
+
 ### Reacting to changes
 ```java
 import skyblockdb.api.SkyblockDbListener;
@@ -151,7 +159,7 @@ db.addListener(new SkyblockDbListener() {
 ```
 Listeners run on the Minecraft client thread right after SkyblockDB has taken in a change, and the new data is
 already readable then. Keep them short. Every method has a no-op default: `onItemsChanged`, `onCurrenciesChanged`,
-`onProfileChanged` and `onReferenceDataChanged`.
+`onProfileChanged`, `onReferenceDataChanged` and `onElectionChanged`.
 
 ### History, changes and observations
 These read the store, so they return a `CompletableFuture` that completes on SkyblockDB's store thread. Hop back to
@@ -179,7 +187,8 @@ are immutable.
   `equipment`, `rift_equipment`, `vault`. More may be added.
 
 ### Compatibility
-`SkyblockDbApi.API_VERSION` goes up when something is added (2: reference data). Members are never removed or
+`SkyblockDbApi.API_VERSION` goes up when something is added (2: reference data, 3: mobs, 4: election, attributes,
+requirements, NPC prices, all recipes). Members are never removed or
 changed outside a major version of SkyblockDB. If you need a newer addition, check `API_VERSION` before calling it.
 
 ## Building from source

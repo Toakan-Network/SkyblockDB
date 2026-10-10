@@ -9,6 +9,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import skyblockdb.ApiImpl;
 import skyblockdb.SkyblockDb;
+import skyblockdb.api.Attribute;
 import skyblockdb.api.LootTable;
 import skyblockdb.api.Mob;
 import skyblockdb.api.MobDrop;
@@ -16,6 +17,8 @@ import skyblockdb.api.Recipe;
 import skyblockdb.api.ReferenceItem;
 import skyblockdb.record.SkyblockIds;
 import skyblockdb.store.Store;
+import tech.thatgravyboat.repolib.api.AttributesAPI;
+import tech.thatgravyboat.repolib.api.IdOverlaysAPI;
 import tech.thatgravyboat.repolib.api.PetsAPI;
 import tech.thatgravyboat.repolib.api.RepoAPI;
 import tech.thatgravyboat.repolib.api.RepoStatus;
@@ -26,6 +29,7 @@ import tech.thatgravyboat.repolib.api.mobs.drop.ItemDrop;
 import tech.thatgravyboat.repolib.api.mobs.drop.PetDrop;
 import tech.thatgravyboat.repolib.api.mobs.drop.PotionDrop;
 import tech.thatgravyboat.repolib.api.mobs.drop.RuneDrop;
+import tech.thatgravyboat.repolib.api.idoverlays.Requirement;
 import tech.thatgravyboat.repolib.api.recipes.CraftingRecipe;
 import tech.thatgravyboat.repolib.api.recipes.ForgeRecipe;
 import tech.thatgravyboat.repolib.api.recipes.KatRecipe;
@@ -40,6 +44,8 @@ import tech.thatgravyboat.repolib.api.recipes.ingredient.PotionIngredient;
 import tech.thatgravyboat.repolib.api.recipes.ingredient.RuneIngredient;
 import tech.thatgravyboat.skyblockapi.api.SkyBlockAPI;
 import tech.thatgravyboat.skyblockapi.api.events.repo.RepoEvent;
+import tech.thatgravyboat.skyblockapi.api.remote.hypixel.itemdata.HypixelApiItem;
+import tech.thatgravyboat.skyblockapi.api.remote.hypixel.itemdata.ItemData;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -59,9 +65,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
@@ -82,6 +91,7 @@ public final class ReferenceData {
     private static final Pattern FORMATTING = Pattern.compile("(?i)§[0-9A-FK-OR]");
     private static final String COIN_ID = "SKYBLOCK_COIN";
     private static final String KIND_UNKNOWN = "unknown_id";
+    private static final Set<String> ALL_KINDS = Set.of("items", "recipes", "mobs", "requirements", "attributes", "prices");
 
     private static final ExecutorService BUILDER = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "SkyblockDB reference build");
@@ -93,9 +103,21 @@ public final class ReferenceData {
 
     /** Readable views, replaced as a whole. */
     private record View(Map<String, ReferenceItem> items, Map<String, List<Recipe>> byOutput,
-                        Map<String, List<Recipe>> byInput, Map<String, Mob> mobs, Map<String, List<Mob>> droppedBy) {
-        static final View EMPTY = new View(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+                        Map<String, List<Recipe>> byInput, Map<String, Mob> mobs, Map<String, List<Mob>> droppedBy,
+                        List<Recipe> allRecipes, Map<String, List<String>> requirements,
+                        Map<String, Attribute> attributes, Map<String, Double> prices) {
+        static final View EMPTY = new View(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), List.of(), Map.of(),
+            Map.of(), Map.of());
     }
+
+    /** Requirements, attributes and NPC prices: replaced whole when they change, without change rows. */
+    private record Extras(Map<String, Object[]> requirements, Map<String, Object[]> attributes,
+                          Map<String, Object[]> prices) {}
+
+    /** How often to rebuild when Hypixel's item list (NPC prices) wasn't loaded yet, and how long to wait between. */
+    private static final int PRICE_RETRIES = 5;
+    private static final long PRICE_RETRY_SECONDS = 60;
+    private static final AtomicInteger priceRetries = new AtomicInteger();
 
     private static volatile View view = View.EMPTY;
     /** IDs already observed this session, so each is written at most once. Client thread only. */
@@ -144,6 +166,27 @@ public final class ReferenceData {
         return view.droppedBy().getOrDefault(key, List.of());
     }
 
+    public static List<Recipe> allRecipes() {
+        return view.allRecipes();
+    }
+
+    public static List<String> requirements(String key) {
+        return view.requirements().getOrDefault(key, List.of());
+    }
+
+    public static Attribute attribute(String id) {
+        return view.attributes().get(id);
+    }
+
+    public static Map<String, Attribute> attributes() {
+        return view.attributes();
+    }
+
+    /** NPC sell price, or null when unknown. */
+    public static Double npcSellPrice(String sbId) {
+        return view.prices().get(sbId);
+    }
+
     /** True once reference data is readable (stored or freshly built). */
     public static boolean ready() {
         return !view.items().isEmpty();
@@ -152,11 +195,8 @@ public final class ReferenceData {
     // Loading from the store (writer thread, right after it opens).
 
     public static void onStoreOpened(Store store) {
-        Map<String, Object[]> items = new HashMap<>(store.items());
-        Map<String, Object[]> recipes = new HashMap<>(store.recipes());
-        Map<String, Object[]> mobs = new HashMap<>(store.mobs());
-        if (items.isEmpty()) return;
-        publish(items, recipes, mobs, Set.of("items", "recipes", "mobs"), Set.of());
+        if (store.items().isEmpty()) return;
+        publish(store, ALL_KINDS, Set.of());
     }
 
     // Building from Repo-Lib.
@@ -264,9 +304,63 @@ public final class ReferenceData {
                 Objects.toString(mob.type(), ""), tables.toString()});
         }
 
-        String hash = hash(items, recipes, mobs);
+        Extras extras = buildExtras();
+        String hash = hash(items, recipes, mobs, extras.requirements(), extras.attributes(), extras.prices());
         String sha = repoSha();
-        Store.get().write(store -> apply(store, items, recipes, mobs, hash, sha));
+        Store.get().write(store -> apply(store, items, recipes, mobs, extras, hash, sha));
+    }
+
+    /** Unlock requirements, attributes and NPC sell prices. */
+    private static Extras buildExtras() {
+        Map<String, Object[]> requirements = new TreeMap<>();
+        for (String rawId : RepoAPI.items().items().keySet()) {
+            Object[] lines = requirementLines(RepoAPI.overlays().getItem(rawId));
+            if (lines != null) requirements.put(SkyblockIds.normalize(rawId), lines);
+        }
+        for (Map.Entry<String, PetsAPI.Data> e : RepoAPI.pets().pets().entrySet()) {
+            for (String tier : e.getValue().tiers().keySet()) {
+                String key = petKey(e.getKey(), tier);
+                Object[] lines = key == null ? null : requirementLines(RepoAPI.overlays().getPet(e.getKey(), tier));
+                if (lines != null) requirements.put(key, lines);
+            }
+        }
+        Map<String, Object[]> attributes = new TreeMap<>();
+        for (Map.Entry<String, AttributesAPI.Attribute> e : RepoAPI.attributes().attributes().entrySet()) {
+            AttributesAPI.Attribute a = e.getValue();
+            String id = SkyblockIds.normalize(e.getKey());
+            attributes.put(id, new Object[]{clean(a.name()), SkyblockIds.normalize(a.shardId()), clean(a.shardName()),
+                Objects.toString(a.rarity(), "").toUpperCase(Locale.ROOT)});
+            Object[] lines = requirementLines(RepoAPI.overlays().getAttribute(e.getKey()));
+            if (lines != null) requirements.put(id, lines);
+        }
+        Map<String, Object[]> prices = new TreeMap<>();
+        for (Map.Entry<String, HypixelApiItem> e : ItemData.INSTANCE.getData().entrySet()) {
+            Float price = e.getValue().getNpcSellPriceFloat();
+            // Through the float text, so 0.3 stays 0.3 instead of 0.30000001192092896.
+            if (price != null && price > 0) {
+                prices.put(SkyblockIds.normalize(e.getKey()), new Object[]{Double.parseDouble(price.toString())});
+            }
+        }
+        if (prices.isEmpty() && priceRetries.incrementAndGet() <= PRICE_RETRIES) {
+            // Hypixel's item list arrives separately; build again once it may be there.
+            SkyblockDb.debug("Hypixel item list not loaded yet; NPC prices follow in {}s", PRICE_RETRY_SECONDS);
+            CompletableFuture.delayedExecutor(PRICE_RETRY_SECONDS, TimeUnit.SECONDS).execute(ReferenceData::buildAsync);
+        }
+        return new Extras(requirements, attributes, prices);
+    }
+
+    /**
+     * The unlock lines of an overlay, or null when there are none. Only entries with the repository's own text: those
+     * come from its "Requires:" crafting line (as Skyblock Shopping List reads them).
+     */
+    private static Object[] requirementLines(IdOverlaysAPI.OverlayData overlay) {
+        if (overlay == null || overlay.requirements() == null) return null;
+        List<String> lines = new ArrayList<>();
+        for (Requirement requirement : overlay.requirements()) {
+            String text = clean(requirement.rawString());
+            if (!text.isBlank() && !lines.contains(text)) lines.add(text);
+        }
+        return lines.isEmpty() ? null : lines.toArray();
     }
 
     /** [key, kind] of a drop, keyed like recipe inputs; null for kinds the repository doesn't name. */
@@ -329,11 +423,10 @@ public final class ReferenceData {
     // Applying (writer thread).
 
     private static void apply(Store store, Map<String, Object[]> items, Map<String, Object[]> recipes,
-                              Map<String, Object[]> mobs, String hash, String sha) {
+                              Map<String, Object[]> mobs, Extras extras, String hash, String sha) {
         if (hash.equals(store.meta().get("reference_hash"))) {
             SkyblockDb.debug("Reference data unchanged");
-            if (!ready()) publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), new HashMap<>(store.mobs()),
-                Set.of("items", "recipes", "mobs"), Set.of());
+            if (!ready()) publish(store, ALL_KINDS, Set.of());
             return;
         }
         boolean baseline = store.items().isEmpty();
@@ -422,6 +515,12 @@ public final class ReferenceData {
             changedMobs.add(id);
         }
 
+        Set<String> changedExtras = new HashSet<>();
+        if (replaceIfDifferent(store.requirements(), extras.requirements())) changedExtras.add("requirements");
+        if (replaceIfDifferent(store.attributes(), extras.attributes())) changedExtras.add("attributes");
+        // Keep the old prices when Hypixel's item list wasn't loaded this time.
+        if (!extras.prices().isEmpty() && replaceIfDifferent(store.npcPrices(), extras.prices())) changedExtras.add("prices");
+
         store.meta().put("reference_hash", hash);
         if (!sha.isEmpty()) store.meta().put("repo_items_sha", sha);
         SkyblockDb.LOGGER.info("Reference data {}: {} items ({} changed), {} recipes ({} outputs changed), {} mobs ({} changed)",
@@ -432,11 +531,28 @@ public final class ReferenceData {
         if (!changedItems.isEmpty() || baseline) kinds.add("items");
         if (!changedRecipeIds.isEmpty() || baseline) kinds.add("recipes");
         if (!changedMobs.isEmpty()) kinds.add("mobs");
+        kinds.addAll(changedExtras);
         Set<String> ids = new HashSet<>(changedItems);
         ids.addAll(changedRecipeIds);
         if (!mobBaseline) ids.addAll(changedMobs);
-        publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), new HashMap<>(store.mobs()), kinds,
-            baseline ? Set.of() : ids);
+        publish(store, kinds, baseline ? Set.of() : ids);
+    }
+
+    /** Makes {@code table} hold exactly {@code fresh}; true when that changed it. */
+    private static boolean replaceIfDifferent(Map<String, Object[]> table, Map<String, Object[]> fresh) {
+        boolean same = table.size() == fresh.size();
+        if (same) {
+            for (Map.Entry<String, Object[]> e : fresh.entrySet()) {
+                if (!Arrays.equals(table.get(e.getKey()), e.getValue())) {
+                    same = false;
+                    break;
+                }
+            }
+        }
+        if (same) return false;
+        table.clear();
+        table.putAll(fresh);
+        return true;
     }
 
     /** type|output -> the encoded recipes, in key order. */
@@ -483,16 +599,18 @@ public final class ReferenceData {
                 store.items().putIfAbsent(e.getKey(), new Object[]{e.getValue(), "", "", "observed", 0L});
             }
             SkyblockDb.debug("Observed {} ID(s) not in the repository: {}", unknown.size(), unknown.keySet());
-            publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), new HashMap<>(store.mobs()),
-                Set.of("items"), unknown.keySet());
+            publish(store, Set.of("items"), unknown.keySet());
         });
     }
 
     // Publishing.
 
-    /** Builds the views from stored rows and tells listeners on the client thread. */
-    private static void publish(Map<String, Object[]> items, Map<String, Object[]> recipes, Map<String, Object[]> mobs,
-                                Set<String> kinds, Set<String> ids) {
+    /** Builds the views from the store's rows (writer thread) and tells listeners on the client thread. */
+    private static void publish(Store store, Set<String> kinds, Set<String> ids) {
+        Map<String, Object[]> items = store.items();
+        Map<String, Object[]> recipes = store.recipes();
+        Map<String, Object[]> mobs = store.mobs();
+        List<Recipe> all = new ArrayList<>();
         Map<String, ReferenceItem> itemView = new HashMap<>();
         items.forEach((id, v) -> itemView.put(id, new ReferenceItem(id, (String) v[0], (String) v[1], (String) v[2],
             (String) v[3], ((Long) v[4]) == 0L ? null : Instant.ofEpochMilli((Long) v[4]))));
@@ -509,6 +627,7 @@ public final class ReferenceData {
             }
             Recipe recipe = new Recipe(type, output, ((Long) v[0]).intValue(), Map.copyOf(inputs), (Long) v[2],
                 ((Long) v[3]).intValue(), (String) v[4]);
+            all.add(recipe);
             byOutput.computeIfAbsent(output, k -> new ArrayList<>()).add(recipe);
             for (String input : inputs.keySet()) byInput.computeIfAbsent(input, k -> new ArrayList<>()).add(recipe);
         });
@@ -537,8 +656,20 @@ public final class ReferenceData {
             for (String key : keys) droppedBy.computeIfAbsent(key, k -> new ArrayList<>()).add(mob);
         });
         droppedBy.replaceAll((k, v) -> List.copyOf(v));
+        Map<String, List<String>> requirementView = new HashMap<>();
+        store.requirements().forEach((key, v) -> {
+            List<String> lines = new ArrayList<>();
+            for (Object o : v) lines.add((String) o);
+            requirementView.put(key, List.copyOf(lines));
+        });
+        Map<String, Attribute> attributeView = new HashMap<>();
+        store.attributes().forEach((id, v) -> attributeView.put(id,
+            new Attribute(id, (String) v[0], (String) v[1], (String) v[2], (String) v[3])));
+        Map<String, Double> priceView = new HashMap<>();
+        store.npcPrices().forEach((id, v) -> priceView.put(id, ((Number) v[0]).doubleValue()));
         view = new View(Map.copyOf(itemView), Map.copyOf(byOutput), Map.copyOf(byInput), Map.copyOf(mobView),
-            Map.copyOf(droppedBy));
+            Map.copyOf(droppedBy), List.copyOf(all), Map.copyOf(requirementView), Map.copyOf(attributeView),
+            Map.copyOf(priceView));
         Set<String> kindsCopy = Set.copyOf(kinds);
         Set<String> idsCopy = Set.copyOf(ids);
         Minecraft.getInstance().execute(() -> ApiImpl.INSTANCE.fire(l -> l.onReferenceDataChanged(kindsCopy, idsCopy)));
@@ -564,10 +695,11 @@ public final class ReferenceData {
         return "";
     }
 
-    private static String hash(Map<String, Object[]> items, Map<String, Object[]> recipes, Map<String, Object[]> mobs) {
+    @SafeVarargs
+    private static String hash(Map<String, Object[]>... maps) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            for (Map<String, Object[]> map : List.of(items, recipes, mobs)) {
+            for (Map<String, Object[]> map : maps) {
                 for (Map.Entry<String, Object[]> e : new TreeMap<>(map).entrySet()) {
                     digest.update(e.getKey().getBytes(StandardCharsets.UTF_8));
                     for (Object o : e.getValue()) digest.update(("\u0000" + o).getBytes(StandardCharsets.UTF_8));

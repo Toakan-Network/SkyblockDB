@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -17,8 +18,11 @@ import java.util.concurrent.CompletableFuture;
  * a major version of SkyblockDB.
  */
 public interface SkyblockDbApi {
-    /** 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). 3: mobs. */
-    int API_VERSION = 3;
+    /**
+     * 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). 3: mobs.
+     * 4: election, attributes, recipe requirements, NPC sell prices, all recipes.
+     */
+    int API_VERSION = 4;
 
     /** The API, once SkyblockDB has started (from client initialisation on). Empty if it isn't installed. */
     static Optional<SkyblockDbApi> get() {
@@ -96,6 +100,30 @@ public interface SkyblockDbApi {
 
     /** Mobs that can drop {@code key} (a SkyBlock ID, or a drop key as in {@link MobDrop#key()}) (API_VERSION 3). */
     List<Mob> droppedBy(String key);
+
+    /** Every recipe, every type (API_VERSION 4). */
+    List<Recipe> allRecipes();
+
+    /**
+     * What unlocks the recipe of {@code key} (a SkyBlock ID, pet {@code BEE;4} or attribute ID), one line each, e.g.
+     * {@code Coal VII} or {@code Heart of the Mountain 2}; empty when nothing is needed or known (API_VERSION 4).
+     */
+    List<String> requirements(String key);
+
+    /** A Hunting attribute by ID (API_VERSION 4). */
+    Optional<Attribute> attribute(String id);
+
+    /** Every Hunting attribute by ID (API_VERSION 4). */
+    Map<String, Attribute> attributes();
+
+    /** What an NPC pays for one {@code sbId}, from Hypixel's item list; empty when unknown (API_VERSION 4). */
+    OptionalDouble npcSellPrice(String sbId);
+
+    /** Mayor and minister, live; empty until SkyblockAPI knows them (API_VERSION 4). */
+    Optional<Election> election();
+
+    /** A mayor or minister perk that is in effect now, e.g. {@code MOLTEN_FORGE} (API_VERSION 4). */
+    Optional<Perk> activePerk(String id);
 
     /** Reference changes recorded since {@code since} (null: all), oldest first. */
     CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since);
