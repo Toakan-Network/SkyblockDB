@@ -82,6 +82,13 @@ SkyblockDB is designed to stay within the [Hypixel Allowed Modifications](https:
 
 As Hypixel states, every modification is used at your own risk.
 
+## When another mod brings a different SkyblockAPI
+Fabric loads only the newest SkyblockAPI that any installed mod bundles, and every mod uses that one. If it no longer
+has something this SkyblockDB calls, only the affected part (sacks, storage, accessory bag, equipment, vault,
+currencies, profile, election, reference data or NPC prices) switches off for that session, with one warning in
+`latest.log` naming the SkyblockAPI version. Everything else keeps working, nothing crashes, and stored data stays.
+`/skyblockdb status` lists what is switched off. Updating SkyblockDB brings it back.
+
 ## Where data is stored
 `config/skyblock-db/` in your game folder, as JSON files: one per table (`items.json`, `item_counts.json`, ...), and
 `.jsonl` logs for the reference changes and, when it is on, the history. Their layout is internal and can change between versions,

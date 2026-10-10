@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import skyblockdb.ApiImpl;
+import skyblockdb.SkyblockApiSafe;
 import skyblockdb.SkyblockDb;
 import skyblockdb.api.Currency;
 import skyblockdb.api.ItemCount;
@@ -116,9 +117,9 @@ public final class Recorder {
     }
 
     public static void register() {
-        SkyBlockAPI.getEventBus().register(SacksChangeEvent.class, 0, false, event -> want());
-        SkyBlockAPI.getEventBus().register(ContainerCloseEvent.class, 0, false, event -> want());
-        SkyBlockAPI.getEventBus().register(ProfileChangeEvent.class, 0, false, event -> want());
+        SkyblockApiSafe.run("sacks", () -> SkyBlockAPI.getEventBus().register(SacksChangeEvent.class, 0, false, event -> want()));
+        SkyblockApiSafe.run("storage", () -> SkyBlockAPI.getEventBus().register(ContainerCloseEvent.class, 0, false, event -> want()));
+        SkyblockApiSafe.run("profile", () -> SkyBlockAPI.getEventBus().register(ProfileChangeEvent.class, 0, false, event -> want()));
         ClientTickEvents.END_CLIENT_TICK.register(Recorder::tick);
     }
 
@@ -147,9 +148,11 @@ public final class Recorder {
 
     /** The current profile's UUID, or null while SkyblockAPI doesn't know it yet. */
     private static String profile() {
-        if (!ProfileAPI.INSTANCE.isLoaded()) return null;
-        UUID uuid = ProfileAPI.INSTANCE.getProfileUuid();
-        return uuid == null ? null : uuid.toString();
+        return SkyblockApiSafe.get("profile", () -> {
+            if (!ProfileAPI.INSTANCE.isLoaded()) return null;
+            UUID uuid = ProfileAPI.INSTANCE.getProfileUuid();
+            return uuid == null ? null : uuid.toString();
+        }, null);
     }
 
     private static void sync(Minecraft client, boolean items) {
@@ -215,10 +218,11 @@ public final class Recorder {
         }
 
         String player = playerUuid(client);
-        String name = Objects.toString(ProfileAPI.INSTANCE.getProfileName(), "");
+        String name = SkyblockApiSafe.get("profile", () -> Objects.toString(ProfileAPI.INSTANCE.getProfileName(), ""), "");
         // The enum name (IRONMAN), as the API documents; its toString is "Ironman".
-        String type = ProfileAPI.INSTANCE.getProfileType() == null ? "" : ProfileAPI.INSTANCE.getProfileType().name();
-        int level = ProfileAPI.INSTANCE.getSbLevel();
+        String type = SkyblockApiSafe.get("profile",
+            () -> ProfileAPI.INSTANCE.getProfileType() == null ? "" : ProfileAPI.INSTANCE.getProfileType().name(), "");
+        int level = SkyblockApiSafe.get("profile", () -> ProfileAPI.INSTANCE.getSbLevel(), 0);
         Object[] profileRow = new Object[]{player, name, type, (long) level, now};
         // Written only when something in it (other than the time) changed.
         String signature = signature(player, name, type, level);
@@ -293,7 +297,59 @@ public final class Recorder {
         return key.substring(first + 1, second);
     }
 
+    /** Reads one group of containers into its own buffer, and keeps it only when the whole read worked. */
+    private interface Section {
+        void read(Map<String, Row> out, Set<String> containers);
+    }
+
+    private static void section(String feature, Map<String, Row> out, Set<String> containers, Section section) {
+        Map<String, Row> rows = new LinkedHashMap<>();
+        Set<String> covered = new HashSet<>();
+        boolean read = SkyblockApiSafe.get(feature, () -> {
+            section.read(rows, covered);
+            return true;
+        }, false);
+        if (!read) return; // nothing from a failed read, so no container looks emptied
+        out.putAll(rows);
+        containers.addAll(covered);
+    }
+
     private static void readItems(Minecraft client, String profile, long now, Map<String, Row> out, Set<String> containers) {
+        section("sacks", out, containers, (o, c) -> readSacks(profile, now, o, c));
+        section("storage", out, containers, (o, c) -> {
+            storage(profile, "enderchest", StorageAPI.INSTANCE.getEnderchests(), o, c);
+            storage(profile, "backpack", StorageAPI.INSTANCE.getBackpacks(), o, c);
+            storage(profile, "rift_storage", StorageAPI.INSTANCE.getRiftStorage(), o, c);
+        });
+        section("accessory_bag", out, containers, (o, c) -> {
+            List<AccessoryBagItem> accessories = new ArrayList<>(AccessoryBagAPI.INSTANCE.getItems());
+            if (accessories.isEmpty()) return;
+            c.add("accessory_bag");
+            for (AccessoryBagItem item : accessories) {
+                stack(profile, "accessory_bag", item.getPage() + "." + item.getSlot(), item.getItem(), now, o);
+            }
+        });
+        section("equipment", out, containers, (o, c) -> {
+            equipment(profile, "equipment", EquipmentAPI.INSTANCE.getNormalEquipment(), now, o, c);
+            equipment(profile, "rift_equipment", EquipmentAPI.INSTANCE.getRiftEquipment(), now, o, c);
+        });
+        section("vault", out, containers, (o, c) -> {
+            List<ItemStack> vault = new ArrayList<>(VaultAPI.INSTANCE.getItems());
+            if (vault.isEmpty()) return;
+            c.add("vault");
+            for (int i = 0; i < vault.size(); i++) stack(profile, "vault", Integer.toString(i), vault.get(i), now, o);
+        });
+
+        if (client.player != null) {
+            containers.add("inventory");
+            Inventory inventory = client.player.getInventory();
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                stack(profile, "inventory", Integer.toString(i), inventory.getItem(i), now, out);
+            }
+        }
+    }
+
+    private static void readSacks(String profile, long now, Map<String, Row> out, Set<String> containers) {
         Map<String, Integer> sacks = new HashMap<>(SacksAPI.INSTANCE.getSackItems());
         if (!sacks.isEmpty()) {
             containers.add("sacks");
@@ -313,33 +369,6 @@ public final class Recorder {
             counts.forEach((id, count) -> {
                 if (count > 0) out.put(Store.key(profile, "sacks", id), new Row(id, count, now, SOURCE, true));
             });
-        }
-        storage(profile, "enderchest", StorageAPI.INSTANCE.getEnderchests(), out, containers);
-        storage(profile, "backpack", StorageAPI.INSTANCE.getBackpacks(), out, containers);
-        storage(profile, "rift_storage", StorageAPI.INSTANCE.getRiftStorage(), out, containers);
-
-        List<AccessoryBagItem> accessories = new ArrayList<>(AccessoryBagAPI.INSTANCE.getItems());
-        if (!accessories.isEmpty()) {
-            containers.add("accessory_bag");
-            for (AccessoryBagItem item : accessories) {
-                stack(profile, "accessory_bag", item.getPage() + "." + item.getSlot(), item.getItem(), now, out);
-            }
-        }
-        equipment(profile, "equipment", EquipmentAPI.INSTANCE.getNormalEquipment(), now, out, containers);
-        equipment(profile, "rift_equipment", EquipmentAPI.INSTANCE.getRiftEquipment(), now, out, containers);
-
-        List<ItemStack> vault = new ArrayList<>(VaultAPI.INSTANCE.getItems());
-        if (!vault.isEmpty()) {
-            containers.add("vault");
-            for (int i = 0; i < vault.size(); i++) stack(profile, "vault", Integer.toString(i), vault.get(i), now, out);
-        }
-
-        if (client.player != null) {
-            containers.add("inventory");
-            Inventory inventory = client.player.getInventory();
-            for (int i = 0; i < inventory.getContainerSize(); i++) {
-                stack(profile, "inventory", Integer.toString(i), inventory.getItem(i), now, out);
-            }
         }
     }
 
@@ -370,6 +399,18 @@ public final class Recorder {
     }
 
     private static Map<String, Currency> currencyChanges(String profile, long now) {
+        Map<String, Double> values = SkyblockApiSafe.get("currencies", Recorder::readCurrencies, Map.of());
+        Map<String, Currency> changes = new LinkedHashMap<>();
+        values.forEach((name, value) -> {
+            String key = Store.key(profile, name);
+            Currency old = currencies.get(key);
+            if (old == null || old.value() != value) changes.put(key, new Currency(profile, name, value, Instant.ofEpochMilli(now)));
+        });
+        currencies.putAll(changes);
+        return changes;
+    }
+
+    private static Map<String, Double> readCurrencies() {
         CurrencyAPI c = CurrencyAPI.INSTANCE;
         Map<String, Double> values = new LinkedHashMap<>();
         values.put("purse", c.getPurse());
@@ -383,14 +424,7 @@ public final class Recorder {
         values.put("north_stars", (double) c.getNorthStars());
         values.put("gems", (double) c.getGems());
         values.put("soulflow", (double) c.getSoulflow());
-        Map<String, Currency> changes = new LinkedHashMap<>();
-        values.forEach((name, value) -> {
-            String key = Store.key(profile, name);
-            Currency old = currencies.get(key);
-            if (old == null || old.value() != value) changes.put(key, new Currency(profile, name, value, Instant.ofEpochMilli(now)));
-        });
-        currencies.putAll(changes);
-        return changes;
+        return values;
     }
 
     private static String playerUuid(Minecraft client) {

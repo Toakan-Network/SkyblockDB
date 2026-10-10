@@ -8,6 +8,7 @@ import kotlin.Unit;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import skyblockdb.ApiImpl;
+import skyblockdb.SkyblockApiSafe;
 import skyblockdb.SkyblockDb;
 import skyblockdb.api.Attribute;
 import skyblockdb.api.LootTable;
@@ -128,11 +129,13 @@ public final class ReferenceData {
 
     /** Rebuilds whenever Repo-Lib (re)loads, and now if it already has. */
     public static void register() {
-        SkyBlockAPI.getEventBus().register(RepoEvent.Reload.class, 0, false, event -> {
-            if (event.getStatus() == RepoStatus.SUCCESS) buildAsync();
-            return Unit.INSTANCE;
+        SkyblockApiSafe.run("reference", () -> {
+            SkyBlockAPI.getEventBus().register(RepoEvent.Reload.class, 0, false, event -> {
+                if (event.getStatus() == RepoStatus.SUCCESS) buildAsync();
+                return Unit.INSTANCE;
+            });
+            if (RepoAPI.isInitialized()) buildAsync();
         });
-        if (RepoAPI.isInitialized()) buildAsync();
     }
 
     // Reads (any thread).
@@ -214,7 +217,7 @@ public final class ReferenceData {
             try {
                 do {
                     AGAIN.set(false);
-                    build();
+                    SkyblockApiSafe.run("reference", ReferenceData::build);
                 } while (AGAIN.get());
             } catch (Throwable t) {
                 SkyblockDb.LOGGER.warn("Reference build failed", t);
@@ -337,6 +340,17 @@ public final class ReferenceData {
             Object[] lines = requirementLines(RepoAPI.overlays().getAttribute(e.getKey()));
             if (lines != null) requirements.put(id, lines);
         }
+        Map<String, Object[]> prices = SkyblockApiSafe.get("npc_prices", ReferenceData::readPrices, new TreeMap<>());
+        if (prices.isEmpty() && !SkyblockApiSafe.isDisabled("npc_prices") && priceRetries.incrementAndGet() <= PRICE_RETRIES) {
+            // Hypixel's item list arrives separately; build again once it may be there.
+            SkyblockDb.debug("Hypixel item list not loaded yet; NPC prices follow in {}s", PRICE_RETRY_SECONDS);
+            CompletableFuture.delayedExecutor(PRICE_RETRY_SECONDS, TimeUnit.SECONDS).execute(ReferenceData::buildAsync);
+        }
+        return new Extras(requirements, attributes, prices);
+    }
+
+    /** NPC sell prices from SkyblockAPI's copy of Hypixel's item list. */
+    private static Map<String, Object[]> readPrices() {
         Map<String, Object[]> prices = new TreeMap<>();
         for (Map.Entry<String, HypixelApiItem> e : ItemData.INSTANCE.getData().entrySet()) {
             Float price = e.getValue().getNpcSellPriceFloat();
@@ -345,12 +359,7 @@ public final class ReferenceData {
                 prices.put(SkyblockIds.normalize(e.getKey()), new Object[]{Double.parseDouble(price.toString())});
             }
         }
-        if (prices.isEmpty() && priceRetries.incrementAndGet() <= PRICE_RETRIES) {
-            // Hypixel's item list arrives separately; build again once it may be there.
-            SkyblockDb.debug("Hypixel item list not loaded yet; NPC prices follow in {}s", PRICE_RETRY_SECONDS);
-            CompletableFuture.delayedExecutor(PRICE_RETRY_SECONDS, TimeUnit.SECONDS).execute(ReferenceData::buildAsync);
-        }
-        return new Extras(requirements, attributes, prices);
+        return prices;
     }
 
     /**

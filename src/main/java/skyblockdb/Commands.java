@@ -28,7 +28,9 @@ final class Commands {
                     Store.get().query(store -> String.format(
                             "%d profile(s), %d item rows, %d currency values, %d history entries",
                             store.profiles().size(), store.itemCounts().size(),
-                            store.currencies().size(), store.history().size()))
+                            store.currencies().size(), store.history().size())
+                            + (SkyblockApiSafe.disabled().isEmpty() ? ""
+                                : "; switched off (SkyblockAPI mismatch, see latest.log): " + String.join(", ", SkyblockApiSafe.disabled())))
                         .whenComplete((text, error) -> {
                             Minecraft client = Minecraft.getInstance();
                             Component message = error == null

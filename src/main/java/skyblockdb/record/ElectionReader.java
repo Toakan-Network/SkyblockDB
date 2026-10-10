@@ -3,6 +3,7 @@ package skyblockdb.record;
 import kotlin.Unit;
 import net.minecraft.client.Minecraft;
 import skyblockdb.ApiImpl;
+import skyblockdb.SkyblockApiSafe;
 import skyblockdb.api.Candidate;
 import skyblockdb.api.Election;
 import skyblockdb.api.Perk;
@@ -29,14 +30,18 @@ public final class ElectionReader {
     private ElectionReader() {}
 
     public static void register() {
-        SkyBlockAPI.getEventBus().register(MayorChangeEvent.class, 0, false, event -> {
+        SkyblockApiSafe.run("election", () -> SkyBlockAPI.getEventBus().register(MayorChangeEvent.class, 0, false, event -> {
             Minecraft.getInstance().execute(() -> ApiImpl.INSTANCE.fire(l -> l.onElectionChanged()));
             return Unit.INSTANCE;
-        });
+        }));
     }
 
     /** Who is in office, or empty while SkyblockAPI knows neither. */
     public static Optional<Election> current() {
+        return SkyblockApiSafe.get("election", ElectionReader::read, Optional.empty());
+    }
+
+    private static Optional<Election> read() {
         Candidate mayor = candidate(ElectionAPI.INSTANCE.getMayor());
         Candidate minister = candidate(ElectionAPI.INSTANCE.getMinister());
         if (mayor == null && minister == null) return Optional.empty();
