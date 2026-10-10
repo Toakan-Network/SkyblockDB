@@ -32,11 +32,12 @@ import java.util.function.Function;
  *   <li>{@code reference_changes}: epoch ms (13 digits)|sequence (6) -> [SkyBlock ID, kind, change, field, old,
  *       new, repo SHA].</li>
  *   <li>{@code observations}: SkyBlock ID|kind -> [seen value, first seen, last seen, sessions, resolved at (0: open)].</li>
+ *   <li>{@code mobs}: mob ID -> [name, island, type, loot tables as JSON].</li>
  * </ul>
  */
 public final class Store {
     /** Bump when the layout changes, and add a step to {@link #migrate}. */
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     /** Key separator. Never part of a UUID, container name, currency name or SkyBlock ID. */
     public static final String SEP = "|";
 
@@ -58,6 +59,7 @@ public final class Store {
     private MVMap<String, Object[]> recipes;
     private MVMap<String, Object[]> referenceChanges;
     private MVMap<String, Object[]> observations;
+    private MVMap<String, Object[]> mobs;
 
     private Store() {}
 
@@ -85,6 +87,7 @@ public final class Store {
                 recipes = store.openMap("recipes", new MVMap.Builder<>());
                 referenceChanges = store.openMap("reference_changes", new MVMap.Builder<>());
                 observations = store.openMap("observations", new MVMap.Builder<>());
+                mobs = store.openMap("mobs", new MVMap.Builder<>());
                 migrate();
                 store.commit();
                 SkyblockDb.debug("Store opened: {} item rows, {} profiles", itemCounts.size(), profiles.size());
@@ -103,7 +106,8 @@ public final class Store {
             throw new IllegalStateException("Store is schema " + version + ", newer than this mod (" + SCHEMA_VERSION + ")");
         }
         // 0 -> 1: new file. 1 -> 2: the reference maps (items, recipes, reference_changes, observations), which
-        // open empty and fill on the next repository load. Later steps go here, in order.
+        // open empty and fill on the next repository load. 2 -> 3: mobs, which fills the same way (the stored
+        // reference hash leaves mobs out before 3, so it differs and the next load rebuilds). Later steps go here.
         meta.put("schema_version", Integer.toString(SCHEMA_VERSION));
     }
 
@@ -183,4 +187,5 @@ public final class Store {
     public MVMap<String, Object[]> recipes() { return recipes; }
     public MVMap<String, Object[]> referenceChanges() { return referenceChanges; }
     public MVMap<String, Object[]> observations() { return observations; }
+    public MVMap<String, Object[]> mobs() { return mobs; }
 }

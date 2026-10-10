@@ -17,8 +17,8 @@ import java.util.concurrent.CompletableFuture;
  * a major version of SkyblockDB.
  */
 public interface SkyblockDbApi {
-    /** 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). */
-    int API_VERSION = 2;
+    /** 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). 3: mobs. */
+    int API_VERSION = 3;
 
     /** The API, once SkyblockDB has started (from client initialisation on). Empty if it isn't installed. */
     static Optional<SkyblockDbApi> get() {
@@ -83,6 +83,15 @@ public interface SkyblockDbApi {
 
     /** The recipes that use {@code sbId} as an input. */
     List<Recipe> usages(String sbId);
+
+    /** A mob by the repository's ID (API_VERSION 3). */
+    Optional<Mob> mob(String id);
+
+    /** Every mob by ID (API_VERSION 3). */
+    Map<String, Mob> mobs();
+
+    /** Mobs that can drop {@code key} (a SkyBlock ID, or a drop key as in {@link MobDrop#key()}) (API_VERSION 3). */
+    List<Mob> droppedBy(String key);
 
     /** Reference changes recorded since {@code since} (null: all), oldest first. */
     CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since);

@@ -3,6 +3,7 @@ package skyblockdb;
 import skyblockdb.api.Currency;
 import skyblockdb.api.HistoryPoint;
 import skyblockdb.api.ItemCount;
+import skyblockdb.api.Mob;
 import skyblockdb.api.Observation;
 import skyblockdb.api.Profile;
 import skyblockdb.api.Recipe;
@@ -196,6 +197,21 @@ public final class ApiImpl implements SkyblockDbApi {
     @Override
     public List<Recipe> usages(String sbId) {
         return ReferenceData.usages(sbId);
+    }
+
+    @Override
+    public Optional<Mob> mob(String id) {
+        return Optional.ofNullable(ReferenceData.mob(id));
+    }
+
+    @Override
+    public Map<String, Mob> mobs() {
+        return ReferenceData.mobs();
+    }
+
+    @Override
+    public List<Mob> droppedBy(String key) {
+        return ReferenceData.droppedBy(key);
     }
 
     @Override

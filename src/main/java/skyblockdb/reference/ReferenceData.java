@@ -9,6 +9,9 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import skyblockdb.ApiImpl;
 import skyblockdb.SkyblockDb;
+import skyblockdb.api.LootTable;
+import skyblockdb.api.Mob;
+import skyblockdb.api.MobDrop;
 import skyblockdb.api.Recipe;
 import skyblockdb.api.ReferenceItem;
 import skyblockdb.record.SkyblockIds;
@@ -16,6 +19,13 @@ import skyblockdb.store.Store;
 import tech.thatgravyboat.repolib.api.PetsAPI;
 import tech.thatgravyboat.repolib.api.RepoAPI;
 import tech.thatgravyboat.repolib.api.RepoStatus;
+import tech.thatgravyboat.repolib.api.mobs.drop.AttributeDrop;
+import tech.thatgravyboat.repolib.api.mobs.drop.CurrencyDrop;
+import tech.thatgravyboat.repolib.api.mobs.drop.EnchantmentDrop;
+import tech.thatgravyboat.repolib.api.mobs.drop.ItemDrop;
+import tech.thatgravyboat.repolib.api.mobs.drop.PetDrop;
+import tech.thatgravyboat.repolib.api.mobs.drop.PotionDrop;
+import tech.thatgravyboat.repolib.api.mobs.drop.RuneDrop;
 import tech.thatgravyboat.repolib.api.recipes.CraftingRecipe;
 import tech.thatgravyboat.repolib.api.recipes.ForgeRecipe;
 import tech.thatgravyboat.repolib.api.recipes.KatRecipe;
@@ -38,6 +48,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -54,7 +65,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 /**
- * Reference data (items, pets, recipes) from SkyblockAPI's Repo-Lib, kept current in the store.
+ * Reference data (items, pets, recipes, mobs) from SkyblockAPI's Repo-Lib, kept current in the store.
  *
  * <p>Each time Repo-Lib (re)loads, the rows are rebuilt off-thread and hashed; when the hash differs from the stored
  * one, the writer thread diffs them against the store: new IDs are added, changed rows updated in place, IDs the
@@ -82,8 +93,8 @@ public final class ReferenceData {
 
     /** Readable views, replaced as a whole. */
     private record View(Map<String, ReferenceItem> items, Map<String, List<Recipe>> byOutput,
-                        Map<String, List<Recipe>> byInput) {
-        static final View EMPTY = new View(Map.of(), Map.of(), Map.of());
+                        Map<String, List<Recipe>> byInput, Map<String, Mob> mobs, Map<String, List<Mob>> droppedBy) {
+        static final View EMPTY = new View(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     private static volatile View view = View.EMPTY;
@@ -120,6 +131,19 @@ public final class ReferenceData {
         return view.byInput().getOrDefault(sbId, List.of());
     }
 
+    public static Mob mob(String id) {
+        return view.mobs().get(id);
+    }
+
+    public static Map<String, Mob> mobs() {
+        return view.mobs();
+    }
+
+    /** Mobs with a drop keyed {@code key}. */
+    public static List<Mob> droppedBy(String key) {
+        return view.droppedBy().getOrDefault(key, List.of());
+    }
+
     /** True once reference data is readable (stored or freshly built). */
     public static boolean ready() {
         return !view.items().isEmpty();
@@ -130,8 +154,9 @@ public final class ReferenceData {
     public static void onStoreOpened(Store store) {
         Map<String, Object[]> items = new HashMap<>(store.items());
         Map<String, Object[]> recipes = new HashMap<>(store.recipes());
+        Map<String, Object[]> mobs = new HashMap<>(store.mobs());
         if (items.isEmpty()) return;
-        publish(items, recipes, Set.of("items", "recipes"), Set.of());
+        publish(items, recipes, mobs, Set.of("items", "recipes", "mobs"), Set.of());
     }
 
     // Building from Repo-Lib.
@@ -204,9 +229,64 @@ public final class ReferenceData {
             }
         });
 
-        String hash = hash(items, recipes);
+        Map<String, Object[]> mobs = new TreeMap<>();
+        for (Map.Entry<String, tech.thatgravyboat.repolib.api.mobs.Mob> e : RepoAPI.mobs().mobs().entrySet()) {
+            tech.thatgravyboat.repolib.api.mobs.Mob mob = e.getValue();
+            JsonArray tables = new JsonArray();
+            if (mob.lootTables() != null) {
+                for (tech.thatgravyboat.repolib.api.mobs.LootTable table : mob.lootTables()) {
+                    JsonObject t = new JsonObject();
+                    t.addProperty("name", clean(table.name()));
+                    t.addProperty("level", table.mobLevel());
+                    t.addProperty("xp", table.xp());
+                    t.addProperty("combatXp", table.combatXp());
+                    JsonArray drops = new JsonArray();
+                    if (table.drops() != null) {
+                        for (tech.thatgravyboat.repolib.api.mobs.drop.MobDrop drop : table.drops()) {
+                            String[] keyKind = dropKey(drop);
+                            if (keyKind == null) continue;
+                            JsonObject d = new JsonObject();
+                            d.addProperty("key", keyKind[0]);
+                            d.addProperty("kind", keyKind[1]);
+                            // Through the float's own text, so 1.4 stays 1.4 instead of 1.399999976158142.
+                            d.addProperty("chance", Double.parseDouble(Float.toString(drop.chance())));
+                            d.addProperty("min", drop.minAmount());
+                            d.addProperty("max", drop.maxAmount());
+                            d.addProperty("condition", clean(drop.condition()));
+                            drops.add(d);
+                        }
+                    }
+                    t.add("drops", drops);
+                    tables.add(t);
+                }
+            }
+            mobs.put(e.getKey(), new Object[]{clean(mob.name()), Objects.toString(mob.island(), ""),
+                Objects.toString(mob.type(), ""), tables.toString()});
+        }
+
+        String hash = hash(items, recipes, mobs);
         String sha = repoSha();
-        Store.get().write(store -> apply(store, items, recipes, hash, sha));
+        Store.get().write(store -> apply(store, items, recipes, mobs, hash, sha));
+    }
+
+    /** [key, kind] of a drop, keyed like recipe inputs; null for kinds the repository doesn't name. */
+    private static String[] dropKey(tech.thatgravyboat.repolib.api.mobs.drop.MobDrop drop) {
+        return switch (drop) {
+            case ItemDrop item -> item.id() == null || item.id().isEmpty() ? null
+                : new String[]{SkyblockIds.normalize(item.id()), "item"};
+            case PetDrop pet -> {
+                String key = petKey(pet.id(), pet.tier());
+                yield key == null ? null : new String[]{key, "pet"};
+            }
+            case CurrencyDrop currency -> currency.currency() == null ? null : new String[]{
+                "COIN".equalsIgnoreCase(currency.currency()) ? COIN_ID : "SKYBLOCK_" + currency.currency().toUpperCase(Locale.ROOT),
+                "currency"};
+            case EnchantmentDrop enchantment -> new String[]{SkyblockIds.normalize(enchantment.id()) + ";" + enchantment.level(), "enchantment"};
+            case PotionDrop potion -> new String[]{SkyblockIds.normalize(potion.id()) + ";" + potion.level(), "potion"};
+            case RuneDrop rune -> new String[]{SkyblockIds.normalize(rune.id()) + ";" + rune.tier(), "rune"};
+            case AttributeDrop attribute -> attribute.id() == null ? null : new String[]{SkyblockIds.normalize(attribute.id()), "attribute"};
+            default -> null;
+        };
     }
 
     /** One recipe as [output count, inputs, coins, seconds, npc] under type|output. */
@@ -248,10 +328,12 @@ public final class ReferenceData {
 
     // Applying (writer thread).
 
-    private static void apply(Store store, Map<String, Object[]> items, Map<String, Object[]> recipes, String hash, String sha) {
+    private static void apply(Store store, Map<String, Object[]> items, Map<String, Object[]> recipes,
+                              Map<String, Object[]> mobs, String hash, String sha) {
         if (hash.equals(store.meta().get("reference_hash"))) {
             SkyblockDb.debug("Reference data unchanged");
-            if (!ready()) publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), Set.of("items", "recipes"), Set.of());
+            if (!ready()) publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), new HashMap<>(store.mobs()),
+                Set.of("items", "recipes", "mobs"), Set.of());
             return;
         }
         boolean baseline = store.items().isEmpty();
@@ -320,17 +402,41 @@ public final class ReferenceData {
             store.recipes().putAll(recipes);
         }
 
+        // Mobs: compared as a whole per mob. The first load of mobs (also after an upgrade to schema 3) is a baseline.
+        boolean mobBaseline = store.mobs().isEmpty();
+        Set<String> changedMobs = new HashSet<>();
+        for (Map.Entry<String, Object[]> e : mobs.entrySet()) {
+            Object[] old = store.mobs().get(e.getKey());
+            if (old != null && Arrays.equals(old, e.getValue())) continue;
+            if (!mobBaseline) {
+                change(store, now, e.getKey(), "mob", old == null ? "added" : "changed", old == null ? "" : "drops",
+                    old == null ? "" : (String) old[3], (String) e.getValue()[3], sha);
+            }
+            store.mobs().put(e.getKey(), e.getValue());
+            changedMobs.add(e.getKey());
+        }
+        for (String id : new ArrayList<>(store.mobs().keySet())) {
+            if (mobs.containsKey(id)) continue;
+            Object[] old = store.mobs().remove(id);
+            change(store, now, id, "mob", "removed", "", (String) old[0], "", sha);
+            changedMobs.add(id);
+        }
+
         store.meta().put("reference_hash", hash);
         if (!sha.isEmpty()) store.meta().put("repo_items_sha", sha);
-        SkyblockDb.LOGGER.info("Reference data {}: {} items ({} changed), {} recipes ({} outputs changed)",
-            baseline ? "stored" : "updated", items.size(), changedItems.size(), recipes.size(), changedRecipeIds.size());
+        SkyblockDb.LOGGER.info("Reference data {}: {} items ({} changed), {} recipes ({} outputs changed), {} mobs ({} changed)",
+            baseline ? "stored" : "updated", items.size(), changedItems.size(), recipes.size(), changedRecipeIds.size(),
+            mobs.size(), changedMobs.size());
 
         Set<String> kinds = new HashSet<>();
         if (!changedItems.isEmpty() || baseline) kinds.add("items");
         if (!changedRecipeIds.isEmpty() || baseline) kinds.add("recipes");
+        if (!changedMobs.isEmpty()) kinds.add("mobs");
         Set<String> ids = new HashSet<>(changedItems);
         ids.addAll(changedRecipeIds);
-        publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), kinds, baseline ? Set.of() : ids);
+        if (!mobBaseline) ids.addAll(changedMobs);
+        publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), new HashMap<>(store.mobs()), kinds,
+            baseline ? Set.of() : ids);
     }
 
     /** type|output -> the encoded recipes, in key order. */
@@ -377,14 +483,16 @@ public final class ReferenceData {
                 store.items().putIfAbsent(e.getKey(), new Object[]{e.getValue(), "", "", "observed", 0L});
             }
             SkyblockDb.debug("Observed {} ID(s) not in the repository: {}", unknown.size(), unknown.keySet());
-            publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), Set.of("items"), unknown.keySet());
+            publish(new HashMap<>(store.items()), new HashMap<>(store.recipes()), new HashMap<>(store.mobs()),
+                Set.of("items"), unknown.keySet());
         });
     }
 
     // Publishing.
 
     /** Builds the views from stored rows and tells listeners on the client thread. */
-    private static void publish(Map<String, Object[]> items, Map<String, Object[]> recipes, Set<String> kinds, Set<String> ids) {
+    private static void publish(Map<String, Object[]> items, Map<String, Object[]> recipes, Map<String, Object[]> mobs,
+                                Set<String> kinds, Set<String> ids) {
         Map<String, ReferenceItem> itemView = new HashMap<>();
         items.forEach((id, v) -> itemView.put(id, new ReferenceItem(id, (String) v[0], (String) v[1], (String) v[2],
             (String) v[3], ((Long) v[4]) == 0L ? null : Instant.ofEpochMilli((Long) v[4]))));
@@ -406,7 +514,31 @@ public final class ReferenceData {
         });
         byOutput.replaceAll((k, v) -> List.copyOf(v));
         byInput.replaceAll((k, v) -> List.copyOf(v));
-        view = new View(Map.copyOf(itemView), Map.copyOf(byOutput), Map.copyOf(byInput));
+        Map<String, Mob> mobView = new HashMap<>();
+        Map<String, List<Mob>> droppedBy = new HashMap<>();
+        mobs.forEach((id, v) -> {
+            List<LootTable> tables = new ArrayList<>();
+            Set<String> keys = new HashSet<>();
+            for (JsonElement te : JsonParser.parseString((String) v[3]).getAsJsonArray()) {
+                JsonObject t = te.getAsJsonObject();
+                List<MobDrop> drops = new ArrayList<>();
+                for (JsonElement de : t.getAsJsonArray("drops")) {
+                    JsonObject d = de.getAsJsonObject();
+                    String key = d.get("key").getAsString();
+                    drops.add(new MobDrop(key, d.get("kind").getAsString(), d.get("chance").getAsDouble(),
+                        d.get("min").getAsInt(), d.get("max").getAsInt(), d.get("condition").getAsString()));
+                    keys.add(key);
+                }
+                tables.add(new LootTable(t.get("name").getAsString(), t.get("level").getAsInt(), t.get("xp").getAsInt(),
+                    t.get("combatXp").getAsInt(), List.copyOf(drops)));
+            }
+            Mob mob = new Mob(id, (String) v[0], (String) v[1], (String) v[2], List.copyOf(tables));
+            mobView.put(id, mob);
+            for (String key : keys) droppedBy.computeIfAbsent(key, k -> new ArrayList<>()).add(mob);
+        });
+        droppedBy.replaceAll((k, v) -> List.copyOf(v));
+        view = new View(Map.copyOf(itemView), Map.copyOf(byOutput), Map.copyOf(byInput), Map.copyOf(mobView),
+            Map.copyOf(droppedBy));
         Set<String> kindsCopy = Set.copyOf(kinds);
         Set<String> idsCopy = Set.copyOf(ids);
         Minecraft.getInstance().execute(() -> ApiImpl.INSTANCE.fire(l -> l.onReferenceDataChanged(kindsCopy, idsCopy)));
@@ -432,10 +564,10 @@ public final class ReferenceData {
         return "";
     }
 
-    private static String hash(Map<String, Object[]> items, Map<String, Object[]> recipes) {
+    private static String hash(Map<String, Object[]> items, Map<String, Object[]> recipes, Map<String, Object[]> mobs) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            for (Map<String, Object[]> map : List.of(items, recipes)) {
+            for (Map<String, Object[]> map : List.of(items, recipes, mobs)) {
                 for (Map.Entry<String, Object[]> e : new TreeMap<>(map).entrySet()) {
                     digest.update(e.getKey().getBytes(StandardCharsets.UTF_8));
                     for (Object o : e.getValue()) digest.update(("\u0000" + o).getBytes(StandardCharsets.UTF_8));

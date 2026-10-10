@@ -47,7 +47,8 @@ final class Commands {
                     }
                     String name = api.item(id).map(i -> i.name() + (i.observed() ? " (observed)" : i.retired() ? " (retired)" : "")).orElse("unknown item");
                     context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": " + id + " (" + name + ") x" + api.count(id)
-                        + ", " + api.recipes(id).size() + " recipe(s), used in " + api.usages(id).size()).withStyle(ChatFormatting.GOLD));
+                        + ", " + api.recipes(id).size() + " recipe(s), used in " + api.usages(id).size()
+                        + ", dropped by " + api.droppedBy(id).size() + " mob(s)").withStyle(ChatFormatting.GOLD));
                     for (ItemCount row : api.counts(id)) {
                         context.getSource().sendFeedback(Component.literal("- " + row.container() + " slot " + row.slot() + ": " + row.amount()).withStyle(ChatFormatting.WHITE));
                     }
