@@ -1,0 +1,14 @@
+Third-Party Notices
+
+Libraries bundled inside the SkyblockDB jar (Jar-in-Jar, unmodified):
+
+SkyblockAPI 4.2.37 (tech.thatgravyboat:skyblock-api), by ThatGravyBoat
+Source: https://maven.teamresourceful.com/repository/maven-public/
+Usage: Reads the player's SkyBlock data (sacks, storage, profile, currencies) and the item repository.
+License: MIT (as declared in its fabric.mod.json). All rights remain with its authors.
+
+H2 MVStore 2.5.252 (com.h2database:h2-mvstore)
+Source: https://h2database.com/html/mvstore.html
+Usage: The local store file.
+License: dual-licensed under the Mozilla Public License 2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
+and the Eclipse Public License 1.0 (https://opensource.org/licenses/eclipse-1.0.php).

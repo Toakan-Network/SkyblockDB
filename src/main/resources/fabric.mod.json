@@ -7,6 +7,7 @@
 	"authors": [
 		"Tad"
 	],
+	"license": "GPL-3.0-only",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
