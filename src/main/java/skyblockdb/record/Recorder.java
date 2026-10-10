@@ -216,7 +216,8 @@ public final class Recorder {
 
         String player = playerUuid(client);
         String name = Objects.toString(ProfileAPI.INSTANCE.getProfileName(), "");
-        String type = Objects.toString(ProfileAPI.INSTANCE.getProfileType(), "");
+        // The enum name (IRONMAN), as the API documents; its toString is "Ironman".
+        String type = ProfileAPI.INSTANCE.getProfileType() == null ? "" : ProfileAPI.INSTANCE.getProfileType().name();
         int level = ProfileAPI.INSTANCE.getSbLevel();
         Object[] profileRow = new Object[]{player, name, type, (long) level, now};
         // Written only when something in it (other than the time) changed.
@@ -296,11 +297,21 @@ public final class Recorder {
         Map<String, Integer> sacks = new HashMap<>(SacksAPI.INSTANCE.getSackItems());
         if (!sacks.isEmpty()) {
             containers.add("sacks");
+            // SkyblockAPI can hold one item under two spellings: a stale "RED_ROSE-5" next to the current
+            // "RED_ROSE:5" (Hypixel's own form). Both normalise to one ID; the ':' entry wins, whatever its count.
+            Map<String, Integer> counts = new HashMap<>();
+            Set<String> fromHypixelSpelling = new HashSet<>();
             sacks.forEach((rawId, count) -> {
                 String id = SkyblockIds.normalize(rawId);
-                if (!id.isEmpty() && count != null && count > 0) {
-                    out.put(Store.key(profile, "sacks", id), new Row(id, count, now, SOURCE, true));
+                if (id.isEmpty() || count == null) return;
+                boolean hypixel = rawId.indexOf(':') >= 0;
+                if (!counts.containsKey(id) || (hypixel && !fromHypixelSpelling.contains(id))) {
+                    counts.put(id, count);
+                    if (hypixel) fromHypixelSpelling.add(id);
                 }
+            });
+            counts.forEach((id, count) -> {
+                if (count > 0) out.put(Store.key(profile, "sacks", id), new Row(id, count, now, SOURCE, true));
             });
         }
         storage(profile, "enderchest", StorageAPI.INSTANCE.getEnderchests(), out, containers);
