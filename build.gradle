@@ -3,7 +3,13 @@ plugins {
 	id 'maven-publish'
 }
 
-version = project.mod_version
+// One jar per Minecraft version (-Pmc=26.3; default in gradle.properties), each bundling only the matching
+// SkyblockAPI build. The version's settings come from versions/<mc>.properties.
+def mcProps = new Properties()
+file("versions/${project.mc}.properties").withInputStream { mcProps.load(it) }
+mcProps.each { key, value -> ext.set(key, value) }
+
+version = "${project.mod_version}+${project.mc}"
 group = project.maven_group
 
 base {
@@ -47,12 +53,11 @@ dependencies {
 	// fabric.mod.json); players install the hypixel-mod-api mod themselves, so it is compile-only, not bundled.
 	compileOnly "net.hypixel:mod-api:1.0.2"
 
-	// SkyblockAPI: the data source. One build per Minecraft version; both are bundled with Jar-in-Jar and
-	// Fabric loads the one that matches (and the newest copy when other mods bundle it too). Needs
-	// fabric-language-kotlin. Compiled against the 26.2 build, the lower bound: only use classes in both.
-	implementation "tech.thatgravyboat:skyblock-api:4.2.37:26.2@jar"
-	include "tech.thatgravyboat:skyblock-api:4.2.37:26.2@jar"
-	include "tech.thatgravyboat:skyblock-api:4.2.37:26.3@jar"
+	// SkyblockAPI: the data source. One build per Minecraft version; only the one for this jar's version is
+	// bundled with Jar-in-Jar (Fabric loads the newest copy when other mods bundle it too). Needs
+	// fabric-language-kotlin. Picked by file classifier, which bypasses its variant metadata.
+	implementation "tech.thatgravyboat:skyblock-api:4.2.37:${project.mc}@jar"
+	include "tech.thatgravyboat:skyblock-api:4.2.37:${project.mc}@jar"
 	// Compile against what SkyblockAPI exposes: Repo-Lib (nested in its jar) and the Kotlin standard library
 	// (from fabric-language-kotlin, installed by the player).
 	compileOnly "tech.thatgravyboat.repo-lib:repo-lib:4.1.11"
@@ -65,9 +70,10 @@ dependencies {
 
 processResources {
 	inputs.property "version", project.version
+	inputs.property "minecraft_range", project.minecraft_range
 
 	filesMatching("fabric.mod.json") {
-		expand "version": project.version
+		expand "version": project.version, "minecraft_range": project.minecraft_range
 	}
 }
 
