@@ -14,9 +14,6 @@
 			"skyblockdb.SkyblockDbClient"
 		]
 	},
-	"mixins": [
-		"skyblock-db.mixins.json"
-	],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "${minecraft_range}",

@@ -71,9 +71,8 @@ SkyblockDB is designed to stay within the [Hypixel Allowed Modifications](https:
   messages or commands to the server. It never hides or changes a message.
 - It does not automate anything: no clicking, crafting, moving items or opening menus.
 - It bundles [SkyblockAPI](https://github.com/SkyblockAPI/SkyblockAPI) (MIT, by ThatGravyBoat), which reads SkyBlock
-  data the same read-only way. On its own, SkyblockAPI can ask Hypixel for your party through the Hypixel Mod API,
-  and polls bazaar and lowest-BIN prices. SkyblockDB switches those off while it is the only mod using SkyblockAPI.
-  If another installed mod uses SkyblockAPI too, nothing is switched off, so that mod keeps working.
+  data the same read-only way. SkyblockDB leaves SkyblockAPI as it is, so mods built on either keep all of its
+  features (see [Network access](#network-access)).
 
 As Hypixel states, every modification is used at your own risk.
 
@@ -83,9 +82,11 @@ change between versions, and other mods and tools should use the API, not the fi
 Deleting it (with the game closed) starts the record from scratch.
 
 ## Network access
-SkyblockDB itself makes no web requests. The bundled SkyblockAPI downloads the item repository (a copy of the
-NotEnoughUpdates repository), which SkyblockDB uses for reference data, and Hypixel's public item list, which
-SkyblockAPI uses for its own item data. Its other requests are switched off as described above.
+SkyblockDB itself makes no web requests. The bundled SkyblockAPI does its usual ones: the item repository (a copy of
+the NotEnoughUpdates repository, which SkyblockDB uses for reference data), Hypixel's public, keyless resources (item
+list, election, skills, bazaar), lowest-BIN prices from its own server (`skyblock-pv.thatgravyboat.tech`), and,
+through the Hypixel Mod API, a party-info request when party chat doesn't match what it knows. SkyblockDB doesn't
+block or change any of them.
 
 ## For mod developers
 Other mods read SkyblockDB through the `skyblockdb.api` package. It is plain Java: records, one interface and a
