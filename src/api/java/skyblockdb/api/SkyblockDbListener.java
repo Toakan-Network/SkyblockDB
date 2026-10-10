@@ -27,4 +27,7 @@ public interface SkyblockDbListener {
 
     /** The mayor or minister changed (API_VERSION 4); read {@link SkyblockDbApi#election()} for the new ones. */
     default void onElectionChanged() {}
+
+    /** The island or area changed (API_VERSION 5); {@code location} is what {@link SkyblockDbApi#location()} reads now. */
+    default void onLocationChanged(Location location) {}
 }

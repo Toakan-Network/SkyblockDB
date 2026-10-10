@@ -20,9 +20,10 @@ import java.util.concurrent.CompletableFuture;
 public interface SkyblockDbApi {
     /**
      * 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). 3: mobs.
-     * 4: election, attributes, recipe requirements, NPC sell prices, all recipes.
+     * 4: election, attributes, recipe requirements, NPC sell prices, all recipes. 5: location, bazaar and lowest BIN
+     * prices.
      */
-    int API_VERSION = 4;
+    int API_VERSION = 5;
 
     /** The API, once SkyblockDB has started (from client initialisation on). Empty if it isn't installed. */
     static Optional<SkyblockDbApi> get() {
@@ -127,6 +128,16 @@ public interface SkyblockDbApi {
 
     /** A mayor or minister perk that is in effect now, e.g. {@code MOLTEN_FORGE} (API_VERSION 4). */
     Optional<Perk> activePerk(String id);
+
+    /** Where the player is, live; empty while not on SkyBlock or not known yet (API_VERSION 5). */
+    Optional<Location> location();
+
+    /**
+     * One {@code sbId}'s price from {@code source}; empty when unknown (API_VERSION 5). Bazaar and lowest BIN come from
+     * SkyblockAPI's own downloads (refreshed every two hours), so they are empty for a moment after the game starts.
+     * Pets have no lowest BIN.
+     */
+    OptionalDouble price(String sbId, PriceSource source);
 
     /** Reference changes recorded since {@code since} (null: all), oldest first. */
     CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since);

@@ -5,6 +5,8 @@ import skyblockdb.api.HistoryPoint;
 import skyblockdb.api.ItemCount;
 import skyblockdb.api.Attribute;
 import skyblockdb.api.Election;
+import skyblockdb.api.Location;
+import skyblockdb.api.PriceSource;
 import skyblockdb.api.Mob;
 import skyblockdb.api.Perk;
 import skyblockdb.api.Observation;
@@ -15,6 +17,9 @@ import skyblockdb.api.ReferenceItem;
 import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.api.SkyblockDbListener;
 import skyblockdb.record.ElectionReader;
+import skyblockdb.record.LocationReader;
+import skyblockdb.record.SkyblockIds;
+import skyblockdb.reference.MarketPrices;
 import skyblockdb.reference.ReferenceData;
 import skyblockdb.store.Store;
 
@@ -258,6 +263,25 @@ public final class ApiImpl implements SkyblockDbApi {
     @Override
     public Optional<Perk> activePerk(String id) {
         return ElectionReader.activePerk(id);
+    }
+
+    @Override
+    public Optional<Location> location() {
+        return LocationReader.current();
+    }
+
+    @Override
+    public OptionalDouble price(String sbId, PriceSource source) {
+        String id = SkyblockIds.normalize(sbId);
+        Double price = switch (source) {
+            case NPC_SELL -> ReferenceData.npcSellPrice(id);
+            case BAZAAR_SELL, BAZAAR_BUY -> {
+                double[] p = MarketPrices.bazaar(id);
+                yield p == null ? null : p[source == PriceSource.BAZAAR_SELL ? 0 : 1];
+            }
+            case LOWEST_BIN -> MarketPrices.lowestBin(id);
+        };
+        return price == null ? OptionalDouble.empty() : OptionalDouble.of(price);
     }
 
     @Override

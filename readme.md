@@ -152,6 +152,9 @@ Reference data beyond items and recipes:
 - `attribute(id)`, `attributes()`: Hunting attributes with their shard ID and name (recipes key attributes by ID).
 - `npcSellPrice(sbId)`: what an NPC pays, from Hypixel's item list.
 - `election()`, `activePerk(id)`: mayor and minister, live, e.g. `activePerk("MOLTEN_FORGE")` while Cole has it.
+- `location()`: island and scoreboard area, live (`onLocationChanged` when either changes).
+- `price(sbId, PriceSource)`: NPC sell, bazaar sell/buy or lowest BIN, from the prices SkyblockAPI already
+  downloads (see [Network access](#network-access)). Pets have no lowest BIN.
 
 ### Reacting to changes
 ```java
@@ -166,7 +169,7 @@ db.addListener(new SkyblockDbListener() {
 ```
 Listeners run on the Minecraft client thread right after SkyblockDB has taken in a change, and the new data is
 already readable then. Keep them short. Every method has a no-op default: `onItemsChanged`, `onCurrenciesChanged`,
-`onProfileChanged`, `onReferenceDataChanged` and `onElectionChanged`.
+`onProfileChanged`, `onReferenceDataChanged`, `onElectionChanged` and `onLocationChanged`.
 
 ### History, changes and observations
 These read the store, so they return a `CompletableFuture` that completes on SkyblockDB's store thread. Hop back to
@@ -195,7 +198,7 @@ are immutable.
 
 ### Compatibility
 `SkyblockDbApi.API_VERSION` goes up when something is added (2: reference data, 3: mobs, 4: election, attributes,
-requirements, NPC prices, all recipes). Members are never removed or
+requirements, NPC prices, all recipes, 5: location, bazaar and lowest-BIN prices). Members are never removed or
 changed outside a major version of SkyblockDB. If you need a newer addition, check `API_VERSION` before calling it.
 
 ## Building from source
