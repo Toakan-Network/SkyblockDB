@@ -219,10 +219,9 @@ public final class ApiImpl implements SkyblockDbApi {
         String from = since == null ? "" : String.format("%013d", since.toEpochMilli());
         return Store.get().query(store -> {
             List<ReferenceChange> out = new ArrayList<>();
-            var cursor = store.referenceChanges().cursor(from);
-            while (cursor.hasNext()) {
-                String key = cursor.next();
-                Object[] v = cursor.getValue();
+            for (Map.Entry<String, Object[]> e : store.referenceChanges().tailMap(from, true).entrySet()) {
+                String key = e.getKey();
+                Object[] v = e.getValue();
                 long at = Long.parseLong(key.substring(0, key.indexOf(Store.SEP)));
                 out.add(new ReferenceChange(Instant.ofEpochMilli(at), (String) v[0], (String) v[1], (String) v[2],
                     (String) v[3], (String) v[4], (String) v[5], (String) v[6]));

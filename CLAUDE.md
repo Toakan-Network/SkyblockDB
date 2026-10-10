@@ -1,7 +1,7 @@
 # SkyblockDB
 
 Fabric client mod (mod id `skyblock-db`, Java package `skyblockdb`) for Hypixel SkyBlock. It records the player's
-items, sacks, storage and currencies from SkyblockAPI into a local MVStore (`h2-mvstore`) and serves them to other
+items, sacks, storage and currencies from SkyblockAPI into local JSON files (Gson, see `store/Table.java`) and serves them to other
 mods through a plain-Java API. Shared rules (commits, versioning, Hypixel rules, resource light) are in the parent
 `Games\Minecraft\CLAUDE.md`. This file only has what differs.
 

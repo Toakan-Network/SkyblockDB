@@ -62,10 +62,6 @@ dependencies {
 	// (from fabric-language-kotlin, installed by the player).
 	compileOnly "tech.thatgravyboat.repo-lib:repo-lib:4.1.11"
 	compileOnly "org.jetbrains.kotlin:kotlin-stdlib:2.4.0"
-
-	// MVStore (from H2): the internal store, pure Java and about 370 KB. Bundled with Jar-in-Jar.
-	implementation "com.h2database:h2-mvstore:2.5.252"
-	include "com.h2database:h2-mvstore:2.5.252"
 }
 
 processResources {

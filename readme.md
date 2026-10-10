@@ -21,7 +21,7 @@ On its own it adds no screens or HUD; it is a data mod for other mods (and, late
 - [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin) 1.13.12 or newer (SkyblockAPI is written in Kotlin)
 - [Hypixel Mod API](https://modrinth.com/mod/hypixel-mod-api) 1.0.2 or newer (SkyBlock detection)
 
-SkyblockAPI and the store library (H2 MVStore) are bundled.
+SkyblockAPI is bundled.
 
 ## Installation
 Put the jar for your Minecraft version and the required mods in your `mods` folder, then start the game and join
@@ -77,9 +77,14 @@ SkyblockDB is designed to stay within the [Hypixel Allowed Modifications](https:
 As Hypixel states, every modification is used at your own risk.
 
 ## Where data is stored
-`config/skyblock-db/skyblock.mv.db` in your game folder. It is an internal file (H2 MVStore format): its layout can
-change between versions, and other mods and tools should use the API, not the file. It stays small, a few MB at most.
-Deleting it (with the game closed) starts the record from scratch.
+`config/skyblock-db/` in your game folder, as JSON files: one per table (`items.json`, `item_counts.json`, ...), and
+`.jsonl` logs for the history and the reference changes. Their layout is internal and can change between versions,
+so other mods and tools should use the API, not the files. Together they stay small, a few MB.
+
+Changes are saved within 5 seconds, and when the game closes. Each file is replaced in one step and the logs are only
+appended to, so a crash loses at most the last few seconds and never leaves a broken file. Deleting the folder (with
+the game closed) starts the record from scratch. Versions before 0.4.5 used a single `skyblock.mv.db` file; it is
+removed on the first start, and recording starts afresh.
 
 ## Network access
 SkyblockDB itself makes no web requests. The bundled SkyblockAPI does its usual ones: the item repository (a copy of
@@ -186,7 +191,6 @@ Per-version settings are in `versions/<mc>.properties`.
 ## License and attribution
 - Code: GPL-3.0-only (see `LICENSE`) with additional terms under GPLv3 section 7 (see `NOTICE`): keep the credits to
   the author, mark modified versions as changed, and give a modified version its own name, mod id and icon.
-- Bundled libraries keep their own licences (see `THIRD_PARTY_NOTICES.txt`): SkyblockAPI (MIT) and H2 MVStore (MPL
-  2.0 / EPL 1.0).
+- The bundled SkyblockAPI keeps its own licence (MIT, see `THIRD_PARTY_NOTICES.txt`).
 - Item and recipe data comes from the NotEnoughUpdates repository through SkyblockAPI's Repo-Lib; follow its license
   when reusing that data.

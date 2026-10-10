@@ -1,65 +1,79 @@
 package skyblockdb.store;
 
 import net.fabricmc.loader.api.FabricLoader;
-import org.h2.mvstore.MVMap;
-import org.h2.mvstore.MVStore;
 import skyblockdb.SkyblockDb;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The internal MVStore file ({@code config/skyblock-db/skyblock.mv.db}). Only the single writer thread touches it:
- * the client thread hands work over with {@link #write} or {@link #query} and never waits on disk. The layout is
+ * The internal store: JSON files in {@code config/skyblock-db/}, one per table, held in memory. Only the single
+ * writer thread touches it: the client thread hands work over with {@link #write} or {@link #query} and never waits
+ * on disk. Changed tables are saved at most every {@link #SAVE_DELAY_SECONDS} seconds, and on close. The layout is
  * internal; other mods read through the public API.
  *
- * <p>Maps ("tables"), keys joined with {@link #SEP}:
+ * <p>Tables, keys joined with {@link #SEP} (see {@link Table} for the file formats):
  * <ul>
- *   <li>{@code meta}: {@code schema_version} and repo SHAs.</li>
+ *   <li>{@code meta}: {@code schema_version}, the reference hash and repo SHA.</li>
  *   <li>{@code profiles}: profile UUID -> [player UUID, profile name, profile type, SkyBlock level, seen at].</li>
  *   <li>{@code item_counts}: profile|container|slot -> [SkyBlock ID, amount, seen at, source, confident].</li>
  *   <li>{@code currencies}: profile|currency -> [value, seen at].</li>
- *   <li>{@code history}: profile|SkyBlock ID|epoch ms (13 digits) -> total amount after the change.</li>
+ *   <li>{@code history} (log): profile|SkyBlock ID|epoch ms (13 digits) -> total amount after the change.</li>
  *   <li>{@code items}: SkyBlock ID -> [name, rarity, category, origin (repo/observed), retired at (0: current)].</li>
  *   <li>{@code recipes}: type|output|n -> [output count, inputs "ID*n;ID*n" (sorted), coins, seconds, npc].</li>
- *   <li>{@code reference_changes}: epoch ms (13 digits)|sequence (6) -> [SkyBlock ID, kind, change, field, old,
- *       new, repo SHA].</li>
+ *   <li>{@code reference_changes} (log): epoch ms (13 digits)|sequence (6) -> [SkyBlock ID, kind, change, field,
+ *       old, new, repo SHA].</li>
  *   <li>{@code observations}: SkyBlock ID|kind -> [seen value, first seen, last seen, sessions, resolved at (0: open)].</li>
  *   <li>{@code mobs}: mob ID -> [name, island, type, loot tables as JSON].</li>
  * </ul>
  */
 public final class Store {
     /** Bump when the layout changes, and add a step to {@link #migrate}. */
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     /** Key separator. Never part of a UUID, container name, currency name or SkyBlock ID. */
     public static final String SEP = "|";
+    /** Changes reach disk at most this long after they were made (a crash loses at most this much). */
+    private static final int SAVE_DELAY_SECONDS = 5;
 
     private static final Store INSTANCE = new Store();
 
-    private final ExecutorService writer = Executors.newSingleThreadExecutor(runnable -> {
+    private final ScheduledThreadPoolExecutor writer = new ScheduledThreadPoolExecutor(1, runnable -> {
         Thread thread = new Thread(runnable, "SkyblockDB writer");
         thread.setDaemon(true);
         return thread;
     });
-    /** Writer thread only. Null until opened, or when opening failed. */
-    private MVStore store;
-    private MVMap<String, String> meta;
-    private MVMap<String, Object[]> profiles;
-    private MVMap<String, Object[]> itemCounts;
-    private MVMap<String, Object[]> currencies;
-    private MVMap<String, Long> history;
-    private MVMap<String, Object[]> items;
-    private MVMap<String, Object[]> recipes;
-    private MVMap<String, Object[]> referenceChanges;
-    private MVMap<String, Object[]> observations;
-    private MVMap<String, Object[]> mobs;
+
+    {
+        // close() saves at once; a save still waiting for its delay is not needed then.
+        writer.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+    }
+
+    // Writer thread only.
+    /** Null until opened, or when opening failed. */
+    private Path dir;
+    private boolean saveScheduled = false;
+    private final Table<String> meta = new Table<>("meta", false);
+    private final Table<Object[]> profiles = new Table<>("profiles", false);
+    private final Table<Object[]> itemCounts = new Table<>("item_counts", false);
+    private final Table<Object[]> currencies = new Table<>("currencies", false);
+    private final Table<Long> history = new Table<>("history", true);
+    private final Table<Object[]> items = new Table<>("items", false);
+    private final Table<Object[]> recipes = new Table<>("recipes", false);
+    private final Table<Object[]> referenceChanges = new Table<>("reference_changes", true);
+    private final Table<Object[]> observations = new Table<>("observations", false);
+    private final Table<Object[]> mobs = new Table<>("mobs", false);
+    private final List<Table<?>> tables = List.of(meta, profiles, itemCounts, currencies, history, items, recipes,
+        referenceChanges, observations, mobs);
 
     private Store() {}
 
@@ -67,34 +81,25 @@ public final class Store {
         return INSTANCE;
     }
 
-    /** Opens the file on the writer thread; {@code onLoaded} then gets every stored row (on the writer thread). */
+    /** Loads the files on the writer thread; {@code onLoaded} then gets every stored row (on the writer thread). */
     public void open(Consumer<Store> onLoaded) {
         writer.execute(() -> {
             try {
-                File dir = new File(FabricLoader.getInstance().getConfigDir().toFile(), SkyblockDb.MOD_ID);
-                if (!dir.isDirectory() && !dir.mkdirs()) throw new IllegalStateException("Cannot create " + dir);
-                store = new MVStore.Builder()
-                    .fileName(new File(dir, "skyblock.mv.db").getPath())
-                    .compress()
-                    .autoCommitDisabled()
-                    .open();
-                meta = store.openMap("meta", new MVMap.Builder<>());
-                profiles = store.openMap("profiles", new MVMap.Builder<>());
-                itemCounts = store.openMap("item_counts", new MVMap.Builder<>());
-                currencies = store.openMap("currencies", new MVMap.Builder<>());
-                history = store.openMap("history", new MVMap.Builder<>());
-                items = store.openMap("items", new MVMap.Builder<>());
-                recipes = store.openMap("recipes", new MVMap.Builder<>());
-                referenceChanges = store.openMap("reference_changes", new MVMap.Builder<>());
-                observations = store.openMap("observations", new MVMap.Builder<>());
-                mobs = store.openMap("mobs", new MVMap.Builder<>());
+                Path folder = FabricLoader.getInstance().getConfigDir().resolve(SkyblockDb.MOD_ID);
+                Files.createDirectories(folder);
+                // Versions before 0.4.5 used an H2 MVStore file, which could lose a session's writes after a crash.
+                if (Files.deleteIfExists(folder.resolve("skyblock.mv.db"))) {
+                    SkyblockDb.LOGGER.info("SkyblockDB: replaced the old store file with JSON files; recording starts afresh");
+                }
+                for (Table<?> table : tables) table.load(folder);
+                dir = folder;
                 migrate();
-                store.commit();
+                saveSoon();
                 SkyblockDb.debug("Store opened: {} item rows, {} profiles", itemCounts.size(), profiles.size());
                 onLoaded.accept(this);
-            } catch (RuntimeException e) {
+            } catch (IOException | RuntimeException e) {
                 SkyblockDb.LOGGER.error("Could not open the SkyblockDB store; nothing will be recorded", e);
-                closeQuietly();
+                dir = null;
             }
         });
     }
@@ -105,37 +110,37 @@ public final class Store {
         if (version > SCHEMA_VERSION) {
             throw new IllegalStateException("Store is schema " + version + ", newer than this mod (" + SCHEMA_VERSION + ")");
         }
-        // 0 -> 1: new file. 1 -> 2: the reference maps (items, recipes, reference_changes, observations), which
-        // open empty and fill on the next repository load. 2 -> 3: mobs, which fills the same way (the stored
-        // reference hash leaves mobs out before 3, so it differs and the next load rebuilds). Later steps go here.
-        meta.put("schema_version", Integer.toString(SCHEMA_VERSION));
+        // 4: JSON files (schemas 1-3 were the MVStore file, which is not carried over). Later steps go here, in order.
+        if (version != SCHEMA_VERSION) meta.put("schema_version", Integer.toString(SCHEMA_VERSION));
     }
 
-    /** Runs {@code change} on the writer thread, then commits it as one batch. Dropped if the store isn't open. */
+    /**
+     * Runs {@code change} on the writer thread; the tables it changed are saved within a few seconds. Dropped if the
+     * store isn't open. A change that throws is logged; what it changed before throwing stays.
+     */
     public void write(Consumer<Store> change) {
         writer.execute(() -> {
-            if (store == null) return;
+            if (dir == null) return;
             try {
                 change.accept(this);
-                store.commit();
             } catch (RuntimeException e) {
                 SkyblockDb.LOGGER.error("SkyblockDB write failed", e);
-                store.rollback();
             }
+            saveSoon();
         });
     }
 
     /** Reads on the writer thread; the future completes there. */
     public <T> CompletableFuture<T> query(Function<Store, T> read) {
         return CompletableFuture.supplyAsync(() -> {
-            if (store == null) throw new IllegalStateException("SkyblockDB store is not open");
+            if (dir == null) throw new IllegalStateException("SkyblockDB store is not open");
             return read.apply(this);
         }, writer);
     }
 
-    /** Commits and closes the file (game shutdown). Waits briefly for queued writes. */
+    /** Saves everything and stops the writer (game shutdown). Waits briefly for queued writes. */
     public void close() {
-        writer.execute(this::closeQuietly);
+        writer.execute(this::save);
         writer.shutdown();
         try {
             if (!writer.awaitTermination(5, TimeUnit.SECONDS)) SkyblockDb.LOGGER.warn("SkyblockDB writer did not finish in time");
@@ -144,14 +149,22 @@ public final class Store {
         }
     }
 
-    private void closeQuietly() {
-        if (store == null) return;
-        try {
-            store.close();
-        } catch (RuntimeException e) {
-            SkyblockDb.LOGGER.warn("Closing the SkyblockDB store failed", e);
+    private void saveSoon() {
+        if (saveScheduled || tables.stream().noneMatch(Table::dirty)) return;
+        saveScheduled = true;
+        writer.schedule(this::save, SAVE_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void save() {
+        saveScheduled = false;
+        if (dir == null) return;
+        for (Table<?> table : tables) {
+            try {
+                table.save(dir);
+            } catch (IOException | RuntimeException e) {
+                SkyblockDb.LOGGER.error("SkyblockDB: could not save {}", table, e);
+            }
         }
-        store = null;
     }
 
     public static String key(String... parts) {
@@ -164,28 +177,19 @@ public final class Store {
     }
 
     /** Every entry whose key starts with {@code prefix} + {@link #SEP}, in key order. */
-    public static <V> List<Map.Entry<String, V>> withPrefix(MVMap<String, V> map, String prefix) {
-        String from = prefix + SEP;
+    public static <V> List<Map.Entry<String, V>> withPrefix(NavigableMap<String, V> map, String prefix) {
         // '|' + 1 is '}', so every key with the prefix sorts before prefix + '}'.
-        String to = prefix + (char) (SEP.charAt(0) + 1);
-        List<Map.Entry<String, V>> out = new java.util.ArrayList<>();
-        var cursor = map.cursor(from, to, false);
-        while (cursor.hasNext()) {
-            String k = cursor.next();
-            if (k.equals(to)) break;
-            out.add(Map.entry(k, cursor.getValue()));
-        }
-        return out;
+        return new ArrayList<>(map.subMap(prefix + SEP, true, prefix + (char) (SEP.charAt(0) + 1), false).entrySet());
     }
 
-    public MVMap<String, String> meta() { return meta; }
-    public MVMap<String, Object[]> profiles() { return profiles; }
-    public MVMap<String, Object[]> itemCounts() { return itemCounts; }
-    public MVMap<String, Object[]> currencies() { return currencies; }
-    public MVMap<String, Long> history() { return history; }
-    public MVMap<String, Object[]> items() { return items; }
-    public MVMap<String, Object[]> recipes() { return recipes; }
-    public MVMap<String, Object[]> referenceChanges() { return referenceChanges; }
-    public MVMap<String, Object[]> observations() { return observations; }
-    public MVMap<String, Object[]> mobs() { return mobs; }
+    public NavigableMap<String, String> meta() { return meta; }
+    public NavigableMap<String, Object[]> profiles() { return profiles; }
+    public NavigableMap<String, Object[]> itemCounts() { return itemCounts; }
+    public NavigableMap<String, Object[]> currencies() { return currencies; }
+    public NavigableMap<String, Long> history() { return history; }
+    public NavigableMap<String, Object[]> items() { return items; }
+    public NavigableMap<String, Object[]> recipes() { return recipes; }
+    public NavigableMap<String, Object[]> referenceChanges() { return referenceChanges; }
+    public NavigableMap<String, Object[]> observations() { return observations; }
+    public NavigableMap<String, Object[]> mobs() { return mobs; }
 }

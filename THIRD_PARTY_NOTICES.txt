@@ -29,9 +29,3 @@ License: MIT. Its license text, as published in the repository (LICENSE.txt, bra
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
-
-H2 MVStore 2.5.252 (com.h2database:h2-mvstore)
-Source: https://h2database.com/html/mvstore.html
-Usage: The local store file.
-License: dual-licensed under the Mozilla Public License 2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
-and the Eclipse Public License 1.0 (https://opensource.org/licenses/eclipse-1.0.php).
