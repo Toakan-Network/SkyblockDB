@@ -106,6 +106,11 @@ list, election, skills, bazaar), lowest-BIN prices from its own server (`skybloc
 through the Hypixel Mod API, a party-info request when party chat doesn't match what it knows. SkyblockDB doesn't
 block or change any of them.
 
+## Security scan
+The 0.5.0 release jars (26.2 and 26.3), and the SkyblockAPI library bundled in each, were scanned with [Java-Triage](https://github.com/cev-api/Java-Triage), a static scanner for malicious Java code and Minecraft mods (network off, nothing
+uploaded). Result: no confirmed malicious behavior and no known malware matched. The report, the jar hashes to check
+your copy against and an explanation of each flagged item are in [security/java-triage](security/java-triage/README.md).
+
 ## For mod developers
 Other mods read SkyblockDB through the `skyblockdb.api` package. It is plain Java: records, one interface and a
 listener, with no dependencies, so your mod doesn't need SkyblockAPI, Kotlin or Fabric API to use it.
