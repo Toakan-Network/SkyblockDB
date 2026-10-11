@@ -1,0 +1,518 @@
+{
+  "root": "cwd/skyblock-db-0.5.0+26.2",
+  "scan_roots": [
+    "cwd/skyblock-db-0.5.0+26.2"
+  ],
+  "scan_diagnostics": {
+    "cwd/skyblock-db-0.5.0+26.2": {
+      "java_files": 34,
+      "class_files": 41,
+      "finding_count": 1,
+      "scan_mode": "java_guarded_plus_class_constant_pool"
+    }
+  },
+  "target_metadata": {
+    "basic_properties": {
+      "subject": "skyblock-db-0.5.0+26.2.jar",
+      "md5": "a8412946a29dd4b1ee1076776142c598",
+      "sha1": "f79a0adbcd09e33e436ddcc5dba537719d299c40",
+      "sha256": "ad4986e01416c82208491b2a677309a960ca582bf82af0ef6bd397b2627434a0",
+      "file_type": "JAR",
+      "compressed": "jar",
+      "magic": "Zip archive data (JAR)",
+      "file_size_text": "4.89 MB",
+      "file_size_bytes": 5129182
+    },
+    "source_jar_metadata": {
+      "name": "skyblock-db-0.5.0+26.2.jar",
+      "path": "<scan-dir>\\skyblock-db-0.5.0+26.2\\skyblock-db-0.5.0+26.2.jar",
+      "size_bytes": 5129182,
+      "size_text": "4.89 MB",
+      "md5": "a8412946a29dd4b1ee1076776142c598",
+      "sha1": "f79a0adbcd09e33e436ddcc5dba537719d299c40",
+      "sha256": "ad4986e01416c82208491b2a677309a960ca582bf82af0ef6bd397b2627434a0"
+    },
+    "artifact_identity": {
+      "scan_root_name": "skyblock-db-0.5.0+26.2",
+      "scan_root_tree_sha256": "58538b2496f42881f8871ad3d7cdc6b54e8fa93a8e813da08688bd3bd2c6beda",
+      "scan_root_file_count": 77,
+      "source_jar": {
+        "name": "skyblock-db-0.5.0+26.2.jar",
+        "path": "<scan-dir>\\skyblock-db-0.5.0+26.2\\skyblock-db-0.5.0+26.2.jar",
+        "size_bytes": 5129182,
+        "size_text": "4.89 MB",
+        "md5": "a8412946a29dd4b1ee1076776142c598",
+        "sha1": "f79a0adbcd09e33e436ddcc5dba537719d299c40",
+        "sha256": "ad4986e01416c82208491b2a677309a960ca582bf82af0ef6bd397b2627434a0"
+      }
+    },
+    "library_fingerprints": {
+      "detected": [],
+      "libraries": {}
+    },
+    "jar_info": {
+      "manifest": "",
+      "archive_metadata": {
+        "contained_directories": 11,
+        "max_directory_depth": 4,
+        "contained_files": 79,
+        "latest_content_modification": "2026-10-11 15:24:36",
+        "earliest_content_modification": "2026-10-11 15:24:33",
+        "contained_files_by_type": {
+          "xml": 0,
+          "ascii": 79
+        }
+      }
+    },
+    "bundle_info": {
+      "contained_files": 79,
+      "uncompressed_size_text": "348.81 KB",
+      "uncompressed_size_bytes": 357178,
+      "earliest_content_modification": "2026-10-11 15:24:33",
+      "latest_content_modification": "2026-10-11 15:24:36",
+      "contained_files_by_type": {
+        "UNKNOWN": 77,
+        "DIRECTORY": 11,
+        "JSON": 2
+      },
+      "contained_files_by_extension": {
+        "CLASS": 41,
+        "JAVA": 34,
+        "JSON": 2,
+        "TXT": 2
+      }
+    }
+  },
+  "scan_mode": "standard",
+  "deobfuscation": {},
+  "decipher": {
+    "java_files": 34,
+    "files_changed": 0,
+    "strings_replaced": 0,
+    "strings_failed": 0,
+    "xor_strings_replaced": 0,
+    "xor_strings_failed": 0,
+    "aes_strings_replaced": 0,
+    "aes_strings_failed": 0,
+    "aes_gcm_strings_replaced": 0,
+    "aes_gcm_strings_failed": 0,
+    "recovered_crypto_keys": [],
+    "output_root": "<scan-dir>\\skyblock-db-0.5.0+26.2_deciphered"
+  },
+  "string_dump": {
+    "strings_count": 4465,
+    "aes_candidates_count": 14,
+    "json": "<scan-dir>\\skyblock-db-0.5.0+26.2\\.java_triage_string_dump.json",
+    "txt": "<scan-dir>\\skyblock-db-0.5.0+26.2\\.java_triage_string_dump.txt"
+  },
+  "invokedynamic_bootstrap": {
+    "class_files_count": 41,
+    "bootstrap_methods_count": 169,
+    "invokedynamic_sites_count": 223,
+    "suspicious_bootstraps_count": 0,
+    "high_value_sites_count": 60,
+    "json": "<scan-dir>\\skyblock-db-0.5.0+26.2\\.java_triage_indy_bootstrap_map.json"
+  },
+  "summary": {
+    "total_findings": 1,
+    "unique_decoded_strings": 1,
+    "category_counts": {
+      "reconstructed_string": 1
+    },
+    "xor_decrypted_count": 0,
+    "decrypted_string_count": 0,
+    "reconstructed_strings": 0,
+    "high_risk_count": 0,
+    "behavior_findings": 26,
+    "high_risk_behavior_count": 0,
+    "behavior_severity_counts": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 26,
+      "info": 0
+    },
+    "verdict_layers": {
+      "proof": 0,
+      "suspicion": 0,
+      "capability": 0
+    },
+    "artifact_findings": 0,
+    "assessment_counts": {
+      "benign": 0,
+      "needs_review": 0,
+      "suspicious": 0
+    },
+    "verdict_tiers": {
+      "confirmed_behavior": 0,
+      "exposed_capability": 0,
+      "suspicious_capability": 26,
+      "library_noise": 0
+    },
+    "contradiction_notes": [],
+    "aes_decrypted_count": 0
+  },
+  "assessment_summary": {
+    "counts": {
+      "benign": 0,
+      "needs_review": 0,
+      "suspicious": 0
+    },
+    "findings": {
+      "benign": [],
+      "needs_review": [],
+      "suspicious": []
+    }
+  },
+  "verdict_tiers": {
+    "confirmed_behavior": 0,
+    "exposed_capability": 0,
+    "suspicious_capability": 26,
+    "library_noise": 0
+  },
+  "contradiction_notes": [],
+  "reconstructed_strings": [
+    {
+      "decoded": "+ String.valueOf(v[1]) +  + String.valueOf(v[2]) +",
+      "file": "skyblockdb\\reference\\ReferenceData.java",
+      "line": 678,
+      "confidence": "high",
+      "category": "reconstructed_string",
+      "function": "groupRecipes",
+      "context": "   673:         return true;\n   674:     }\n   675: \n   676:     private static Map<String, List<String>> groupRecipes(Map<String, Object[]> recipes) {\n   677:         TreeMap<String, List<String>> out = new TreeMap<String, List<String>>();\n   678:         new TreeMap<String, Object[]>(recipes).forEach((key, v) -> out.computeIfAbsent(key.substring(0, key.lastIndexOf(\"|\")), k -> new ArrayList()).add(String.valueOf(v[0]) + \"x <- \" + String.valueOf(v[1]) + \" +\" + String.valueOf(v[2]) + \"c \" + String.valueOf(v[3]) + \"s \" + String.valueOf(v[4])));\n   679:         out.values().forEach(Collections::sort);\n   680:         return out;\n   681:     }\n   682: \n   683:     private static void change(Store store, long now, String id, String kind, String change, String field, String old, String fresh, String sha) {",
+      "note": "source=string_reconstruction kind=literal_concat parts=2"
+    }
+  ],
+  "runtime_c2": {
+    "attempted": false,
+    "resolved": false
+  },
+  "exfiltration_analysis": {
+    "status": "not_detected",
+    "confirmed": false,
+    "data_sources": [],
+    "endpoints": []
+  },
+  "url_assembly": {
+    "c2_domain": "",
+    "c2_domain_source": "",
+    "fallback_domain": "",
+    "dynamic_c2_domain": "",
+    "dynamic_c2_domain_source": "",
+    "dynamic_c2_domain_decoy": false,
+    "cdn_path": "",
+    "endpoints": [],
+    "assembled_urls": [],
+    "unresolved_paths": [],
+    "note": "C2 domain not resolved; set manually via blockchain eth_call or fallback domain string"
+  },
+  "infra_probe": {
+    "probed": false,
+    "results": []
+  },
+  "ratter_scanner": {
+    "attempted": false,
+    "error": "",
+    "results": []
+  },
+  "jlab_static_scan": {
+    "attempted": false,
+    "error": "",
+    "status_code": 0,
+    "upload_file": "",
+    "upload_size": 0,
+    "file_name": "",
+    "file_size": 0,
+    "total_signatures": 0,
+    "matched_signatures": 0,
+    "signatures": [],
+    "retry_after": null,
+    "rate_limit_limit": null,
+    "rate_limit_remaining": null
+  },
+  "network_endpoint_assessment": {
+    "total_urls": 0,
+    "vendor_urls": [],
+    "unknown_urls": [],
+    "suspicious_urls": [],
+    "vendor_count": 0,
+    "unknown_count": 0,
+    "suspicious_count": 0
+  },
+  "variant_detections": {
+    "detected_count": 0,
+    "detected": []
+  },
+  "raw_string_detections": [],
+  "heuristic_detections": [],
+  "minecraft_modules": {
+    "detected": false,
+    "module_count": 1,
+    "modules": [
+      {
+        "name": "Reference Item",
+        "description": "Reference Item",
+        "category": "OTHER",
+        "file": "skyblockdb/api/ReferenceItem.java"
+      }
+    ],
+    "categories": {
+      "OTHER": 1
+    }
+  },
+  "stage2_analysis": {
+    "enabled": true,
+    "attempted": false,
+    "static_only_no_execution": true,
+    "error": "stage2 analysis requires network access; rerun without --no-network",
+    "aes_payload_decrypted": false,
+    "aes_payload_note": "AES decryption requires the full ciphertext bytes from the C2 download endpoint. If the download succeeded, the AES key/IV must be extracted from decoded strings and passed to the offline aes_cbc_nopadding_decrypt() helper.",
+    "payload_url_resolved": ""
+  },
+  "stage2_manual_payload_url": "",
+  "blockchain_indicators": {
+    "contracts": [],
+    "selectors": [],
+    "rpc_urls": [],
+    "rpc_hosts": [],
+    "api_key_urls": []
+  },
+  "findings": [],
+  "behavior_findings": [
+    {
+      "file": "skyblockdb\\ApiImpl.java",
+      "line": 90,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "    85:         for (SkyblockDbListener listener : this.listeners) {\n    86:             try {\n    87:                 call.accept(listener);\n    88:             }\n    89:             catch (RuntimeException e) {\n    90:                 SkyblockDb.LOGGER.warn(\"A SkyblockDB listener failed: {}\", (Object)listener.getClass().getName(), (Object)e);\n    91:             }\n    92:         }\n    93:     }\n    94: \n    95:     private View view(String profile) {",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\Commands.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\Commands.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\HypixelLocationListener.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\SkyblockApiSafe.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\SkyblockDbClient.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\SkyblockDetector.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\Attribute.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\Candidate.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\Currency.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\LootTable.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\Mob.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\Perk.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\Profile.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\ReferenceItem.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\api\\SkyblockDbListener.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\record\\ElectionReader.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\record\\LocationReader.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\record\\LocationReader.java",
+      "line": 57,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "    52:         if (!api.isOnSkyBlock()) {\n    53:             return Optional.empty();\n    54:         }\n    55:         SkyBlockIsland island = api.getIsland();\n    56:         SkyBlockArea area = api.getArea();\n    57:         return Optional.of(new Location(island == null ? \"\" : Objects.toString(island.getId(), \"\"), island == null ? \"\" : Objects.toString(island.getDisplayName(), \"\"), area == null ? \"\" : Objects.toString(area.getName(), \"\").trim()));\n    58:     }\n    59: }\n    60: ",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\record\\Recorder.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\record\\Recorder.java",
+      "line": 455,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "   450:         values.put(\"soulflow\", Double.valueOf(c.getSoulflow()));\n   451:         return values;\n   452:     }\n   453: \n   454:     private static String playerUuid(Minecraft client) {\n   455:         UUID account = client.getUser().getProfileId();\n   456:         return account == null ? \"\" : account.toString();\n   457:     }\n   458: \n   459:     private static void submit(String profile, long now, Object[] profileRow, List<Map.Entry<String, Row>> puts, List<String> removes, Map<String, Long> totals, Map<String, Currency> currencyChanges) {\n   460:         Store.get().write(store -> {",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\record\\Recorder.java",
+      "line": 455,
+      "behavior": "minecraft_uuid_access",
+      "evidence": "Reads Minecraft session UUID (method_44717/getProfileId/getUuid/getId)",
+      "context": "   450:         values.put(\"soulflow\", Double.valueOf(c.getSoulflow()));\n   451:         return values;\n   452:     }\n   453: \n   454:     private static String playerUuid(Minecraft client) {\n   455:         UUID account = client.getUser().getProfileId();\n   456:         return account == null ? \"\" : account.toString();\n   457:     }\n   458: \n   459:     private static void submit(String profile, long now, Object[] profileRow, List<Map.Entry<String, Row>> puts, List<String> removes, Map<String, Long> totals, Map<String, Currency> currencyChanges) {\n   460:         Store.get().write(store -> {",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\reference\\ReferenceData.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\reference\\ReferenceData.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\store\\Store.java",
+      "line": 1,
+      "behavior": "minecraft_session_access",
+      "evidence": "Accesses Minecraft session/user object (method_1548/getSession/getUser)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    },
+    {
+      "file": "skyblockdb\\store\\Table.java",
+      "line": 1,
+      "behavior": "minecraft_username_access",
+      "evidence": "Reads Minecraft session username (method_1676/getName/getUsername)",
+      "context": "",
+      "severity": "low",
+      "verdict_tier": "suspicious_capability"
+    }
+  ],
+  "artifact_findings": []
+}
