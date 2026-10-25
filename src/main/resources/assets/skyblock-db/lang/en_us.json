@@ -1,0 +1,18 @@
+{
+  "skyblock-db.command.status": "%s: %s profile(s), %s item rows, %s currency values, %s history entries",
+  "skyblock-db.command.status.disabled": "; switched off (SkyblockAPI mismatch, see latest.log): %s",
+  "skyblock-db.command.status.closed": "%s: store not open (see latest.log)",
+  "skyblock-db.command.no_profile": "%s: no SkyBlock profile yet",
+  "skyblock-db.command.item": "%s: %s (%s) x%s, %s recipe(s), used in %s, dropped by %s mob(s)",
+  "skyblock-db.command.item.observed": "%s (observed)",
+  "skyblock-db.command.item.retired": "%s (retired)",
+  "skyblock-db.command.item.unknown": "unknown item",
+  "skyblock-db.command.item.row": "- %s slot %s: %s",
+  "skyblock-db.command.history.on": "%s history is on",
+  "skyblock-db.command.history.debug": "%s history is on while debug logging is on (removed at the next start)",
+  "skyblock-db.command.history.off": "%s history is off (turn on with /skyblockdb history on)",
+  "skyblock-db.command.history.switched_on": "%s history on: item totals are logged from now on",
+  "skyblock-db.command.history.switched_off": "%s history off: the log is removed at the next start",
+  "skyblock-db.command.debug.on": "%s debug logging on, history too (until the next start)",
+  "skyblock-db.command.debug.off": "%s debug logging off"
+}

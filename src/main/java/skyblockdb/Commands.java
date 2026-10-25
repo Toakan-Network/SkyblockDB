@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import skyblockdb.api.ItemCount;
 import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.record.SkyblockIds;
@@ -25,17 +26,21 @@ final class Commands {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
             literal("skyblockdb")
                 .then(literal("status").executes(context -> {
-                    Store.get().query(store -> String.format(
-                            "%d profile(s), %d item rows, %d currency values, %d history entries",
-                            store.profiles().size(), store.itemCounts().size(),
-                            store.currencies().size(), store.history().size())
-                            + (SkyblockApiSafe.disabled().isEmpty() ? ""
-                                : "; switched off (SkyblockAPI mismatch, see latest.log): " + String.join(", ", SkyblockApiSafe.disabled())))
+                    Store.get().query(store -> {
+                            MutableComponent text = Component.translatable("skyblock-db.command.status", SkyblockDb.NAME,
+                                store.profiles().size(), store.itemCounts().size(),
+                                store.currencies().size(), store.history().size());
+                            if (!SkyblockApiSafe.disabled().isEmpty()) {
+                                text.append(Component.translatable("skyblock-db.command.status.disabled",
+                                    String.join(", ", SkyblockApiSafe.disabled())));
+                            }
+                            return text;
+                        })
                         .whenComplete((text, error) -> {
                             Minecraft client = Minecraft.getInstance();
                             Component message = error == null
-                                ? Component.literal(SkyblockDb.NAME + ": " + text).withStyle(ChatFormatting.GOLD)
-                                : Component.literal(SkyblockDb.NAME + ": store not open (see latest.log)").withStyle(ChatFormatting.RED);
+                                ? text.withStyle(ChatFormatting.GOLD)
+                                : Component.translatable("skyblock-db.command.status.closed", SkyblockDb.NAME).withStyle(ChatFormatting.RED);
                             client.execute(() -> client.gui.hud.getChat().addClientSystemMessage(message));
                         });
                     return 1;
@@ -45,40 +50,45 @@ final class Commands {
                     String id = SkyblockIds.normalize(StringArgumentType.getString(context, "id"));
                     SkyblockDbApi api = SkyblockDbApi.get().orElseThrow();
                     if (api.currentProfile().isEmpty()) {
-                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": no SkyBlock profile yet").withStyle(ChatFormatting.RED));
+                        context.getSource().sendFeedback(Component.translatable("skyblock-db.command.no_profile", SkyblockDb.NAME).withStyle(ChatFormatting.RED));
                         return 0;
                     }
-                    String name = api.item(id).map(i -> i.name() + (i.observed() ? " (observed)" : i.retired() ? " (retired)" : "")).orElse("unknown item");
-                    context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + ": " + id + " (" + name + ") x" + api.count(id)
-                        + ", " + api.recipes(id).size() + " recipe(s), used in " + api.usages(id).size()
-                        + ", dropped by " + api.droppedBy(id).size() + " mob(s)").withStyle(ChatFormatting.GOLD));
+                    Component name = api.item(id)
+                        .<Component>map(i -> i.observed() ? Component.translatable("skyblock-db.command.item.observed", i.name())
+                            : i.retired() ? Component.translatable("skyblock-db.command.item.retired", i.name())
+                            : Component.literal(i.name()))
+                        .orElseGet(() -> Component.translatable("skyblock-db.command.item.unknown"));
+                    context.getSource().sendFeedback(Component.translatable("skyblock-db.command.item", SkyblockDb.NAME, id, name,
+                        api.count(id), api.recipes(id).size(), api.usages(id).size(), api.droppedBy(id).size())
+                        .withStyle(ChatFormatting.GOLD));
                     for (ItemCount row : api.counts(id)) {
-                        context.getSource().sendFeedback(Component.literal("- " + row.container() + " slot " + row.slot() + ": " + row.amount()).withStyle(ChatFormatting.WHITE));
+                        context.getSource().sendFeedback(Component.translatable("skyblock-db.command.item.row", row.container(),
+                            row.slot(), row.amount()).withStyle(ChatFormatting.WHITE));
                     }
                     return 1;
                 })))
                 .then(literal("history")
                     .executes(context -> {
-                        String state = Store.get().historySwitchedOn() ? "on"
-                            : SkyblockDb.debugLogging ? "on while debug logging is on (removed at the next start)"
-                            : "off (turn on with /skyblockdb history on)";
-                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " history is " + state).withStyle(ChatFormatting.GOLD));
+                        String state = Store.get().historySwitchedOn() ? "skyblock-db.command.history.on"
+                            : SkyblockDb.debugLogging ? "skyblock-db.command.history.debug"
+                            : "skyblock-db.command.history.off";
+                        context.getSource().sendFeedback(Component.translatable(state, SkyblockDb.NAME).withStyle(ChatFormatting.GOLD));
                         return 1;
                     })
                     .then(literal("on").executes(context -> {
                         Store.get().setRecordHistory(true);
-                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " history on: item totals are logged from now on").withStyle(ChatFormatting.GOLD));
+                        context.getSource().sendFeedback(Component.translatable("skyblock-db.command.history.switched_on", SkyblockDb.NAME).withStyle(ChatFormatting.GOLD));
                         return 1;
                     }))
                     .then(literal("off").executes(context -> {
                         Store.get().setRecordHistory(false);
-                        context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " history off: the log is removed at the next start").withStyle(ChatFormatting.GOLD));
+                        context.getSource().sendFeedback(Component.translatable("skyblock-db.command.history.switched_off", SkyblockDb.NAME).withStyle(ChatFormatting.GOLD));
                         return 1;
                     })))
                 .then(literal("debug").executes(context -> {
                     SkyblockDb.debugLogging = !SkyblockDb.debugLogging;
-                    context.getSource().sendFeedback(Component.literal(SkyblockDb.NAME + " debug logging "
-                        + (SkyblockDb.debugLogging ? "on, history too (until the next start)" : "off")).withStyle(ChatFormatting.GOLD));
+                    context.getSource().sendFeedback(Component.translatable(SkyblockDb.debugLogging
+                        ? "skyblock-db.command.debug.on" : "skyblock-db.command.debug.off", SkyblockDb.NAME).withStyle(ChatFormatting.GOLD));
                     return 1;
                 }))
         ));

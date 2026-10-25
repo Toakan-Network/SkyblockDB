@@ -62,6 +62,11 @@ dependencies {
 	// (from fabric-language-kotlin, installed by the player).
 	compileOnly "tech.thatgravyboat.repo-lib:repo-lib:4.1.11"
 	compileOnly "org.jetbrains.kotlin:kotlin-stdlib:2.4.0"
+
+	// Unit tests (the lang file check); nothing here ships in the jar.
+	testImplementation platform("org.junit:junit-bom:5.14.2")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
 processResources {
@@ -71,6 +76,10 @@ processResources {
 	filesMatching("fabric.mod.json") {
 		expand "version": project.version, "minecraft_range": project.minecraft_range
 	}
+}
+
+test {
+	useJUnitPlatform()
 }
 
 tasks.withType(JavaCompile).configureEach {
