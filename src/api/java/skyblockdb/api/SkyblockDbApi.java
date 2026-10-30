@@ -21,9 +21,9 @@ public interface SkyblockDbApi {
     /**
      * 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). 3: mobs.
      * 4: election, attributes, recipe requirements, NPC sell prices, all recipes. 5: location, bazaar and lowest BIN
-     * prices.
+     * prices. 6: trophy catches, Accessory Bag with recombobulated flags.
      */
-    int API_VERSION = 5;
+    int API_VERSION = 6;
 
     /** The API, once SkyblockDB has started (from client initialisation on). Empty if it isn't installed. */
     static Optional<SkyblockDbApi> get() {
@@ -138,6 +138,21 @@ public interface SkyblockDbApi {
      * Pets have no lowest BIN.
      */
     OptionalDouble price(String sbId, PriceSource source);
+
+    /**
+     * Trophy Frog catches of the current profile, one entry per frog, live from SkyblockAPI; empty if it can't be read
+     * (API_VERSION 6). Client thread only.
+     */
+    List<TrophyProgress> trophyFrogs();
+
+    /** Trophy Fish catches of the current profile, as {@link #trophyFrogs} (API_VERSION 6). Client thread only. */
+    List<TrophyProgress> trophyFish();
+
+    /**
+     * The current profile's Accessory Bag, live from SkyblockAPI, as of the last time its menu was open; empty until
+     * then (API_VERSION 6). Client thread only.
+     */
+    List<AccessoryItem> accessories();
 
     /** Reference changes recorded since {@code since} (null: all), oldest first. */
     CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since);

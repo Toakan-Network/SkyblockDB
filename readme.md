@@ -203,7 +203,8 @@ are immutable.
 
 ### Compatibility
 `SkyblockDbApi.API_VERSION` goes up when something is added (2: reference data, 3: mobs, 4: election, attributes,
-requirements, NPC prices, all recipes, 5: location, bazaar and lowest-BIN prices). Members are never removed or
+requirements, NPC prices, all recipes, 5: location, bazaar and lowest-BIN prices, 6: trophy catches, Accessory Bag
+with recombobulated flags). Members are never removed or
 changed outside a major version of SkyblockDB. If you need a newer addition, check `API_VERSION` before calling it.
 
 ## Building from source

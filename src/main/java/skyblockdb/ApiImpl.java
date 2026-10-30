@@ -1,5 +1,6 @@
 package skyblockdb;
 
+import skyblockdb.api.AccessoryItem;
 import skyblockdb.api.Currency;
 import skyblockdb.api.HistoryPoint;
 import skyblockdb.api.ItemCount;
@@ -16,6 +17,8 @@ import skyblockdb.api.ReferenceChange;
 import skyblockdb.api.ReferenceItem;
 import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.api.SkyblockDbListener;
+import skyblockdb.api.TrophyProgress;
+import skyblockdb.record.CollectionReader;
 import skyblockdb.record.ElectionReader;
 import skyblockdb.record.LocationReader;
 import skyblockdb.record.SkyblockIds;
@@ -268,6 +271,21 @@ public final class ApiImpl implements SkyblockDbApi {
     @Override
     public Optional<Location> location() {
         return LocationReader.current();
+    }
+
+    @Override
+    public List<TrophyProgress> trophyFrogs() {
+        return CollectionReader.trophyFrogs();
+    }
+
+    @Override
+    public List<TrophyProgress> trophyFish() {
+        return CollectionReader.trophyFish();
+    }
+
+    @Override
+    public List<AccessoryItem> accessories() {
+        return CollectionReader.accessories();
     }
 
     @Override
