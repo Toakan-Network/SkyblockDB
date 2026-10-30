@@ -21,9 +21,9 @@ public interface SkyblockDbApi {
     /**
      * 1: items, currencies, profiles, history. 2: reference data (items, recipes, changes, observations). 3: mobs.
      * 4: election, attributes, recipe requirements, NPC sell prices, all recipes. 5: location, bazaar and lowest BIN
-     * prices. 6: trophy catches, Accessory Bag with recombobulated flags.
+     * prices. 6: trophy catches, Accessory Bag with recombobulated flags. 7: Forge contents.
      */
-    int API_VERSION = 6;
+    int API_VERSION = 7;
 
     /** The API, once SkyblockDB has started (from client initialisation on). Empty if it isn't installed. */
     static Optional<SkyblockDbApi> get() {
@@ -153,6 +153,12 @@ public interface SkyblockDbApi {
      * then (API_VERSION 6). Client thread only.
      */
     List<AccessoryItem> accessories();
+
+    /**
+     * What is in the current profile's Forge, live from SkyblockAPI, as of the last time its menu was open; empty until
+     * then or if it can't be read (API_VERSION 7). Client thread only.
+     */
+    List<ForgeItem> forging();
 
     /** Reference changes recorded since {@code since} (null: all), oldest first. */
     CompletableFuture<List<ReferenceChange>> referenceChanges(Instant since);

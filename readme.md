@@ -34,6 +34,7 @@ SkyBlock. Recording starts by itself.
 | Ender chest, backpacks, rift storage | SkyblockAPI, while you have them open | when a menu closes |
 | Accessory bag, equipment (normal and rift), vault | SkyblockAPI, while you have them open | when a menu closes |
 | Player inventory | the game | when a menu closes, and on sack changes |
+| Forge contents (through the API only, not stored here) | SkyblockAPI, from the Forge menu | when that menu is open |
 | Purse, bank, coop bank, bits, copper, motes, sowdust, kernels, north stars, gems, soulflow | SkyblockAPI | checked once a second, in memory |
 | Profile (name, type, SkyBlock level) | SkyblockAPI | on profile change |
 | Items, pets, recipes (crafting, forge, shop, Kat) | SkyblockAPI's copy of the item repository | when the repository reloads |
@@ -204,7 +205,7 @@ are immutable.
 ### Compatibility
 `SkyblockDbApi.API_VERSION` goes up when something is added (2: reference data, 3: mobs, 4: election, attributes,
 requirements, NPC prices, all recipes, 5: location, bazaar and lowest-BIN prices, 6: trophy catches, Accessory Bag
-with recombobulated flags). Members are never removed or
+with recombobulated flags, 7: Forge contents). Members are never removed or
 changed outside a major version of SkyblockDB. If you need a newer addition, check `API_VERSION` before calling it.
 
 ## Building from source

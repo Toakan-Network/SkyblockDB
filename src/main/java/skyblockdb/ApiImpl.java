@@ -17,6 +17,7 @@ import skyblockdb.api.ReferenceChange;
 import skyblockdb.api.ReferenceItem;
 import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.api.SkyblockDbListener;
+import skyblockdb.api.ForgeItem;
 import skyblockdb.api.TrophyProgress;
 import skyblockdb.record.CollectionReader;
 import skyblockdb.record.ElectionReader;
@@ -286,6 +287,11 @@ public final class ApiImpl implements SkyblockDbApi {
     @Override
     public List<AccessoryItem> accessories() {
         return CollectionReader.accessories();
+    }
+
+    @Override
+    public List<ForgeItem> forging() {
+        return CollectionReader.forging();
     }
 
     @Override
