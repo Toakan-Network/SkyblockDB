@@ -5,6 +5,7 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/workflows/build.yml'
       - 'src/**'
       - 'versions/**'
       - 'build.gradle'
@@ -12,6 +13,7 @@ on:
       - 'settings.gradle'
   pull_request:
     paths:
+      - '.github/workflows/build.yml'
       - 'src/**'
       - 'versions/**'
       - 'build.gradle'
