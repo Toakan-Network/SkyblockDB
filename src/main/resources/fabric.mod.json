@@ -8,6 +8,11 @@
 		"Tad"
 	],
 	"license": "GPL-3.0-only",
+	"contact": {
+		"homepage": "https://github.com/Toakan-Network/SkyblockDB",
+		"sources": "https://github.com/Toakan-Network/SkyblockDB",
+		"issues": "https://github.com/Toakan-Network/SkyblockDB/issues"
+	},
 	"environment": "client",
 	"entrypoints": {
 		"client": [
