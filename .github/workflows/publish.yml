@@ -1,0 +1,132 @@
+# Attaches the jars (one per Minecraft version: 26.2 and 26.3, plus the API jar for other mods to compile against) to
+# the GitHub release whenever a release is published, and publishes the mod jars to Modrinth and CurseForge once those
+# are set up. The release notes become the changelog, and CurseForge rejects files without one, so don't leave them
+# empty.
+#
+# Runs as three chained jobs: check the tag -> build (reusing build.yml) -> publish.
+#
+# Setup (a platform is skipped while its token secret is missing, so these can wait):
+#   1. Create the project on Modrinth and add its Project ID as a repo secret named MODRINTH_ID.
+#   2. Create a Modrinth personal access token with the "Create versions" scope and add it as a repo secret named
+#      MODRINTH_TOKEN.
+#   3. Create the project on CurseForge and add its Project ID as a repo secret named CURSEFORGE_ID.
+#   4. Create a CurseForge API token (account settings > API tokens) and add it as a repo secret named
+#      CURSEFORGE_TOKEN.
+#   5. The 26.3 jar goes to Modrinth and CurseForge only once it has passed a real SkyBlock test in a 26.3 client: then
+#      add a repo variable (Settings > Secrets and variables > Actions > Variables) named PUBLISH_26_3 set to true.
+#
+# The Hypixel Mod API isn't on CurseForge, so it is left out of the CurseForge relations; the
+# CurseForge description tells players to install it themselves.
+
+name: publish
+
+on:
+  release:
+    types: [published]
+
+# Read-only by default; only the publish job gets write access.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v7
+
+      - name: check tag matches mod_version
+        run: |
+          v=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$v" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match mod_version $v in gradle.properties"
+            exit 1
+          fi
+
+  build:
+    needs: check
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v7
+
+      - name: download built jars
+        uses: actions/download-artifact@v8
+        with:
+          name: Artifacts
+          path: build/libs/
+
+      - name: read mod version
+        id: ver
+        run: echo "v=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
+      # The API jar is plain Java, the same for every Minecraft version, so one copy goes on the release.
+      - name: attach jars to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.ver.outputs.v }}
+        run: |
+          cp "build/libs/skyblock-db-$V+26.2-api.jar" "build/libs/skyblock-db-api-$V.jar"
+          gh release upload "$GITHUB_REF_NAME" "build/libs/skyblock-db-$V+26.2.jar" "build/libs/skyblock-db-$V+26.3.jar" "build/libs/skyblock-db-api-$V.jar" --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: publish 26.2 to modrinth and curseforge
+        uses: Kir-Antipov/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3
+        with:
+          modrinth-id: ${{ secrets.MODRINTH_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
+
+          curseforge-id: ${{ secrets.CURSEFORGE_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          files: |
+            build/libs/skyblock-db-${{ steps.ver.outputs.v }}+26.2.jar
+
+          name: SkyblockDB ${{ steps.ver.outputs.v }} for 26.2
+          version: ${{ steps.ver.outputs.v }}+26.2
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          loaders: fabric
+          game-versions: |
+            26.2
+          java: |
+            25
+
+          dependencies: |
+            fabric-api(required){curseforge:306612}
+            fabric-language-kotlin(required){curseforge:308769}
+            hypixel-mod-api(required)#(ignore:curseforge)
+
+      - name: publish 26.3 to modrinth and curseforge
+        if: vars.PUBLISH_26_3 == 'true'
+        uses: Kir-Antipov/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3
+        with:
+          modrinth-id: ${{ secrets.MODRINTH_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
+
+          curseforge-id: ${{ secrets.CURSEFORGE_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          files: |
+            build/libs/skyblock-db-${{ steps.ver.outputs.v }}+26.3.jar
+
+          name: SkyblockDB ${{ steps.ver.outputs.v }} for 26.3
+          version: ${{ steps.ver.outputs.v }}+26.3
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          loaders: fabric
+          game-versions: |
+            26.3
+          java: |
+            25
+
+          dependencies: |
+            fabric-api(required){curseforge:306612}
+            fabric-language-kotlin(required){curseforge:308769}
+            hypixel-mod-api(required)#(ignore:curseforge)
