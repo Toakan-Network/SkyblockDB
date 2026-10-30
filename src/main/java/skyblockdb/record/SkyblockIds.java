@@ -14,10 +14,12 @@ import java.util.WeakHashMap;
 
 /**
  * SkyBlock IDs in one canonical form, the repo's (NEU) spelling, so every source and the reference data agree:
- * pets "BEE;4" (type;tier index), item variants "INK_SACK-3" (Hypixel writes "INK_SACK:3").
+ * pets "BEE;4" (type;tier index), item variants "INK_SACK-3" (Hypixel writes "INK_SACK:3"), Abicases
+ * "ABICASE_BLUE_RED" (Hypixel writes "ABICASE" and a model).
  */
 public final class SkyblockIds {
     private static final String PET_ID = "PET";
+    private static final String ABICASE_ID = "ABICASE";
     /** Pet rarities in the order of the NEU pet ID suffix ("BEE;4" = Legendary Bee). */
     private static final List<String> PET_TIERS = List.of("COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC");
     /**
@@ -46,9 +48,15 @@ public final class SkyblockIds {
         return id;
     }
 
+    /** Hypixel writes every case as "ABICASE" with its kind in {@code model}; the repo has one ID per kind. */
+    static String abicase(String model) {
+        return model.isBlank() ? ABICASE_ID : ABICASE_ID + "_" + normalize(model);
+    }
+
     private static String read(ItemStack stack) {
         CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         String id = data.getStringOr("id", "");
+        if (ABICASE_ID.equals(id)) return abicase(data.getStringOr("model", ""));
         if (!PET_ID.equals(id)) return normalize(id);
         try {
             JsonObject info = JsonParser.parseString(data.getStringOr("petInfo", "")).getAsJsonObject();
