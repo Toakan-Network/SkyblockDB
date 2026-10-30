@@ -7,6 +7,7 @@ import skyblockdb.api.SkyblockDbApi;
 import skyblockdb.record.ElectionReader;
 import skyblockdb.record.LocationReader;
 import skyblockdb.record.Recorder;
+import skyblockdb.record.TrophyMemory;
 import skyblockdb.reference.ReferenceData;
 import skyblockdb.store.Store;
 
@@ -19,6 +20,7 @@ public final class SkyblockDbClient implements ClientModInitializer {
         Store.get().open(store -> {
             Recorder.onStoreOpened(store);
             ReferenceData.onStoreOpened(store);
+            TrophyMemory.onStoreOpened(store);
         });
         Recorder.register();
         ReferenceData.register();

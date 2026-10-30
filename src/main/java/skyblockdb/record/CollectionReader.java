@@ -41,7 +41,7 @@ public final class CollectionReader {
                 out.add(new TrophyProgress(type.getInternalName(), type.getStrippedName(),
                     tiers(TrophyFrogAPI.INSTANCE.getCaught(type))));
             }
-            return List.copyOf(out);
+            return TrophyMemory.merged(TrophyMemory.FROGS, out);
         }, List.of());
     }
 
@@ -52,7 +52,7 @@ public final class CollectionReader {
                 out.add(new TrophyProgress(type.getInternalName(), type.getStrippedName(),
                     tiers(TrophyFishingAPI.INSTANCE.getCaughtTiers(type))));
             }
-            return List.copyOf(out);
+            return TrophyMemory.merged(TrophyMemory.FISH, out);
         }, List.of());
     }
 

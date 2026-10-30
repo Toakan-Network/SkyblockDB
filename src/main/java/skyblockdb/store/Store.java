@@ -40,6 +40,7 @@ import java.util.function.Function;
  *   <li>{@code requirements}: SkyBlock ID, pet or attribute ID -> [unlock line, ...].</li>
  *   <li>{@code attributes}: attribute ID -> [name, shard ID, shard name, rarity].</li>
  *   <li>{@code npc_prices}: SkyBlock ID -> [NPC sell price].</li>
+ *   <li>{@code trophies}: profile|frogs or fish|trophy ID -> [bronze, silver, gold, diamond].</li>
  * </ul>
  */
 public final class Store {
@@ -84,8 +85,9 @@ public final class Store {
     private final Table<Object[]> requirements = new Table<>("requirements", false);
     private final Table<Object[]> attributes = new Table<>("attributes", false);
     private final Table<Object[]> npcPrices = new Table<>("npc_prices", false);
+    private final Table<Object[]> trophies = new Table<>("trophies", false);
     private final List<Table<?>> tables = List.of(meta, profiles, itemCounts, currencies, history, items, recipes,
-        referenceChanges, observations, mobs, requirements, attributes, npcPrices);
+        referenceChanges, observations, mobs, requirements, attributes, npcPrices, trophies);
 
     private Store() {}
 
@@ -246,4 +248,5 @@ public final class Store {
     public NavigableMap<String, Object[]> requirements() { return requirements; }
     public NavigableMap<String, Object[]> attributes() { return attributes; }
     public NavigableMap<String, Object[]> npcPrices() { return npcPrices; }
+    public NavigableMap<String, Object[]> trophies() { return trophies; }
 }

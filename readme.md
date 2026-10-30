@@ -35,6 +35,7 @@ SkyBlock. Recording starts by itself.
 | Accessory bag, equipment (normal and rift), vault | SkyblockAPI, while you have them open | when a menu closes |
 | Player inventory | the game | when a menu closes, and on sack changes |
 | Forge contents (through the API only, not stored here) | SkyblockAPI, from the Forge menu | when that menu is open |
+| Trophy Frog and Trophy Fish catches | SkyblockAPI, with a copy kept here because SkyblockAPI 4.2.37 saves both to one file, so each can wipe the other | when read through the API |
 | Purse, bank, coop bank, bits, copper, motes, sowdust, kernels, north stars, gems, soulflow | SkyblockAPI | checked once a second, in memory |
 | Profile (name, type, SkyBlock level) | SkyblockAPI | on profile change |
 | Items, pets, recipes (crafting, forge, shop, Kat) | SkyblockAPI's copy of the item repository | when the repository reloads |
